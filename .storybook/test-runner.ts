@@ -29,7 +29,8 @@
  * When env `VISUAL_SNAPSHOT=1` is set, `postVisit` ALSO captures a screenshot
  * of `#storybook-root` and either (a) writes it to `__visual_snapshots__/<id>.png`
  * if `VISUAL_SNAPSHOT_UPDATE=1`, or (b) diffs against the existing baseline
- * using Playwright's bundled PNG comparator (pixelmatch under the hood).
+ * using `pixelmatch` (driven by `pngjs` decoders), with per-pixel color-diff
+ * threshold and an absolute maxDiffPixels budget.
  *
  * The default `test-storybook:ci` script does NOT enable this mode — visual
  * regression is opt-in via the new `test-storybook:visual` /
@@ -50,6 +51,8 @@ import path from "node:path";
 import { type TestRunnerConfig, getStoryContext } from "@storybook/test-runner";
 import { configureAxe, getViolations, injectAxe } from "axe-playwright";
 import type { ImpactValue, Result as AxeResult } from "axe-core";
+import pixelmatch from "pixelmatch";
+import { PNG } from "pngjs";
 
 const FAILING_IMPACTS: ReadonlyArray<ImpactValue> = ["serious", "critical"];
 
@@ -58,11 +61,15 @@ const JSONL_PATH = path.join(REPORT_DIR, "wave6a-a11y-violations.jsonl");
 
 // Visual regression configuration. Opt-in via VISUAL_SNAPSHOT=1.
 //
-// Implementation note: we lean on Playwright's bundled image comparator
-// (pixelmatch + pngjs, both ship inside playwright-core) so we avoid
-// adding new project dependencies for D3. The comparator path is private
-// API but stable across the 1.x range; if a future bump rearranges it,
-// we degrade to a byte-equal compare and log a warning rather than crash.
+// Implementation note: we use `pixelmatch` + `pngjs` directly (both
+// declared as devDependencies). An earlier revision reached into
+// playwright-core's private `lib/server/utils/comparators` path; that
+// path resolved fine locally but silently failed in CI, causing the
+// comparator to fall back to byte-equal and reporting "byte mismatch"
+// for every story (sub-pixel jitter between macOS-local baselines and
+// ubuntu-CI rendering). The current implementation depends only on
+// public APIs and fails loudly if either package is missing — there is
+// no silent degradation path.
 const VISUAL_SNAPSHOT_ENABLED = process.env.VISUAL_SNAPSHOT === "1";
 const VISUAL_SNAPSHOT_UPDATE = process.env.VISUAL_SNAPSHOT_UPDATE === "1";
 const VISUAL_SNAPSHOT_ONLY = process.env.VISUAL_SNAPSHOT_ONLY === "1";
@@ -109,47 +116,14 @@ const summarize = (violations: AxeResult[]) =>
   }));
 
 /**
- * Lazily resolve Playwright's bundled PNG comparator. It's a private path
- * (`playwright-core/lib/server/utils/comparators`) but ships in every install
- * of `playwright`, which we already depend on transitively via the
- * test-runner. If the import fails (e.g., upstream rearranges layout), we
- * degrade to a byte-equal compare and log once.
+ * Compare two PNG buffers with pixelmatch under a per-pixel color-diff
+ * threshold (`VISUAL_SNAPSHOT_THRESHOLD`, default 0.1) and an absolute
+ * pixel-count budget (`VISUAL_SNAPSHOT_MAX_DIFF_PIXELS`, default 100).
+ *
+ * Fails fast on dimension mismatches and PNG decode errors — these are
+ * never legitimate pixel-jitter cases, so surfacing the cause directly
+ * is more useful than reporting a giant diff count.
  */
-type ImageComparator = (
-  actualBuffer: Buffer,
-  expectedBuffer: Buffer,
-  options: {
-    maxDiffPixels?: number;
-    maxDiffPixelRatio?: number;
-    threshold?: number;
-  },
-) => { errorMessage: string; diff?: Buffer } | null;
-
-let cachedComparator: ImageComparator | null | undefined;
-let comparatorWarned = false;
-
-const getImageComparator = (): ImageComparator | null => {
-  if (cachedComparator !== undefined) return cachedComparator;
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const mod: { getComparator?: (mime: string) => ImageComparator } =
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      require("playwright-core/lib/server/utils/comparators");
-    cachedComparator = mod.getComparator?.("image/png") ?? null;
-  } catch (err) {
-    if (!comparatorWarned) {
-      console.warn(
-        `[test-runner.visual] Could not load Playwright PNG comparator (${
-          (err as Error).message
-        }); falling back to byte-equal compare.`,
-      );
-      comparatorWarned = true;
-    }
-    cachedComparator = null;
-  }
-  return cachedComparator;
-};
-
 const compareSnapshots = (
   actual: Buffer,
   expected: Buffer,
@@ -157,19 +131,48 @@ const compareSnapshots = (
   if (Buffer.compare(actual, expected) === 0) {
     return { match: true };
   }
-  const comparator = getImageComparator();
-  if (!comparator) {
+
+  let actualPng: PNG;
+  let expectedPng: PNG;
+  try {
+    actualPng = PNG.sync.read(actual);
+    expectedPng = PNG.sync.read(expected);
+  } catch (err) {
     return {
       match: false,
-      reason: "byte mismatch (comparator unavailable; install playwright)",
+      reason: `PNG decode failure: ${(err as Error).message}`,
     };
   }
-  const result = comparator(actual, expected, {
-    threshold: VISUAL_SNAPSHOT_THRESHOLD,
-    maxDiffPixels: VISUAL_SNAPSHOT_MAX_DIFF_PIXELS,
-  });
-  if (!result) return { match: true };
-  return { match: false, reason: result.errorMessage };
+
+  if (
+    actualPng.width !== expectedPng.width ||
+    actualPng.height !== expectedPng.height
+  ) {
+    return {
+      match: false,
+      reason: `dimension mismatch (baseline ${expectedPng.width}x${expectedPng.height}, actual ${actualPng.width}x${actualPng.height})`,
+    };
+  }
+
+  const { width, height } = actualPng;
+  const diff = new PNG({ width, height });
+  const diffPixels = pixelmatch(
+    actualPng.data,
+    expectedPng.data,
+    diff.data,
+    width,
+    height,
+    { threshold: VISUAL_SNAPSHOT_THRESHOLD },
+  );
+
+  if (diffPixels > VISUAL_SNAPSHOT_MAX_DIFF_PIXELS) {
+    return {
+      match: false,
+      reason: `${diffPixels} pixel(s) differ (threshold ratio=${VISUAL_SNAPSHOT_THRESHOLD}, maxDiffPixels=${VISUAL_SNAPSHOT_MAX_DIFF_PIXELS})`,
+    };
+  }
+
+  return { match: true };
 };
 
 const config: TestRunnerConfig = {
