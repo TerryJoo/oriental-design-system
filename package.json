@@ -1,6 +1,6 @@
 {
   "name": "@jyi/design-system",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "type": "module",
   "description": "Oriental design system with Heritage/Neon dual-era theming for React and Tailwind CSS",
   "author": "yungikjoo",

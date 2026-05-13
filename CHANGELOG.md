@@ -4,6 +4,13 @@ All notable changes to **@jyi/design-system** will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.1](https://github.com/TerryJoo/oriental-design-system/compare/v0.1.0...v0.1.1) (2026-05-13)
+
+
+### Bug Fixes
+
+* **visual-regression:** replace playwright-core private comparator with pixelmatch+pngjs ([aa31913](https://github.com/TerryJoo/oriental-design-system/commit/aa31913171c7a66da3c40404736d022d6830dfeb))
+
 ## [Unreleased]
 
 The package is at `0.1.0` and remains `private: true`. This entry consolidates everything that has landed since the initial scaffold and reflects the current `main` working tree ahead of the first published release.
