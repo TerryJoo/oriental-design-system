@@ -60,6 +60,12 @@ const meta = {
   component: DropdownMenu,
   tags: ["autodocs"],
   parameters: {
+    // DropdownMenu's surface mounts via a portal, so `#storybook-root`
+    // (what the test-runner screenshots) only ever contains the trigger
+    // button. The resulting snapshot is just button pixels — meaningless
+    // as a menu regression test and prone to cross-OS font-rendering
+    // jitter.
+    visualSnapshot: { disable: true },
     docs: {
       description: {
         component:

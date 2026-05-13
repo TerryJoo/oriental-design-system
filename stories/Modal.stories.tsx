@@ -102,6 +102,11 @@ const meta = {
   tags: ["autodocs"],
   parameters: {
     layout: "centered",
+    // Modal portals to `document.body`, so `#storybook-root` (what the
+    // test-runner screenshots) only ever contains the trigger button.
+    // The resulting snapshot is just button pixels — meaningless as a
+    // Modal regression test and prone to cross-OS font-rendering jitter.
+    visualSnapshot: { disable: true },
     docs: {
       description: {
         component: [
