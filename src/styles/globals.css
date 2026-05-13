@@ -1,0 +1,246 @@
+/* Self-bundled via @fontsource — no CDN dependency.
+   Weights mirror the design system's typographic scale (regular / medium / bold).
+   Gowun Batang ships only 400 + 700; all others include 500 as well.
+
+   Subset strategy: we import the unified `<weight>.css` (NOT the per-script
+   `korean-<weight>.css` / `latin-<weight>.css` shards). The unified CSS for
+   noto-serif-kr / ibm-plex-sans-kr / gowun-batang already declares 90+
+   @font-face rules with `unicode-range`, so the browser fetches only the
+   codepoint chunks it actually paints. The single-file subset shards drop
+   the unicode-range hints and ship a monolithic ~500KB-1MB Korean blob,
+   which would regress real-world payload. Keep the unified imports.
+
+   Pretendard ships only the latin subset on @fontsource (no Korean glyph
+   data on npm). Korean coverage falls back to `Apple SD Gothic Neo` /
+   `Noto Sans KR` / `Malgun Gothic` via the body font-family stack below.
+
+   Consumer apps that want to preload the active era's default fonts:
+   see docs/reference/FONTS.md. */
+@import "@fontsource/pretendard/400.css";
+@import "@fontsource/pretendard/500.css";
+@import "@fontsource/pretendard/700.css";
+@import "@fontsource/gowun-batang/400.css";
+@import "@fontsource/gowun-batang/700.css";
+@import "@fontsource/noto-serif-kr/400.css";
+@import "@fontsource/noto-serif-kr/500.css";
+@import "@fontsource/noto-serif-kr/700.css";
+@import "@fontsource/jetbrains-mono/400.css";
+@import "@fontsource/jetbrains-mono/500.css";
+@import "@fontsource/jetbrains-mono/700.css";
+@import "@fontsource/ibm-plex-sans-kr/400.css";
+@import "@fontsource/ibm-plex-sans-kr/500.css";
+@import "@fontsource/ibm-plex-sans-kr/700.css";
+@import "@fontsource/cormorant-garamond/400.css";
+@import "@fontsource/cormorant-garamond/500.css";
+@import "@fontsource/cormorant-garamond/700.css";
+@import "@fontsource/orbitron/400.css";
+@import "@fontsource/orbitron/500.css";
+@import "@fontsource/orbitron/700.css";
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* ── Default era · Heritage ─────────────────────────────────
+       These defaults make `bg-era-*`, `text-era-*`, `font-era-*`
+       and `[transition-duration:var(--era-dur-*)]` resolve cleanly
+       even when no [data-era] attribute is set on <html>.
+       Components stay readable without opting into the era system. */
+
+    /* Accent palette */
+    --accent-50: 252 245 236;
+    --accent-100: 243 224 199;
+    --accent-200: 230 196 158;
+    --accent-300: 211 164 122;
+    --accent-400: 192 133 92;
+    --accent-500: 167 106 68;
+    --accent-600: 138 80 48;
+    --accent-700: 108 61 36;
+    --accent-800: 78 43 25;
+    --accent-900: 54 30 17;
+    --accent-950: 31 17 10;
+
+    /* Surface */
+    --era-surface-base: #f6efe1;
+    --era-surface-raised: #fbf5e8;
+    --era-surface-sunken: #e7dcc4;
+    --era-surface-overlay: rgba(44, 30, 17, 0.55);
+
+    /* Ink */
+    --era-ink-primary: #2b1d10;
+    --era-ink-muted: #6e5a3f;
+    --era-ink-inverse: #fbf5e8;
+
+    /* Edge — color-only AND full border-shorthand */
+    --era-edge-color-soft: rgba(43, 29, 16, 0.22);
+    --era-edge-color-hard: rgba(43, 29, 16, 0.6);
+    --era-edge-color-seal: #7a2d1a;
+    --era-edge-soft: 1px solid var(--era-edge-color-soft);
+    --era-edge-hard: 1.5px solid var(--era-edge-color-hard);
+    --era-edge-seal: 2px solid var(--era-edge-color-seal);
+
+    /* Shadow */
+    --era-shadow-card:
+      0 1px 0 rgba(78, 56, 30, 0.12), 0 6px 18px -10px rgba(60, 40, 20, 0.35);
+    --era-shadow-modal: 0 12px 40px -12px rgba(60, 40, 20, 0.45);
+    --era-shadow-tooltip: 0 2px 10px -2px rgba(60, 40, 20, 0.3);
+    --era-shadow-pressed: inset 0 2px 6px rgba(60, 40, 20, 0.25);
+
+    /* Motion */
+    --era-ease-brush: cubic-bezier(0.22, 0.61, 0.36, 1);
+    --era-ease-charge: cubic-bezier(0.4, 0, 0.2, 1);
+    --era-dur-fast: 220ms;
+    --era-dur-normal: 380ms;
+    --era-dur-slow: 640ms;
+
+    /* Intent */
+    --era-intent-success: #4f7a3c;
+    --era-intent-warning: #c88d2b;
+    --era-intent-error: #a3341f;
+
+    /* Typography */
+    --font-display:
+      "Gowun Batang", "Cormorant Garamond", "AppleMyungjo", "Hoefler Text",
+      Didot, "Apple SD Gothic Neo", "Malgun Gothic", serif;
+    --font-body:
+      "Noto Serif KR", "Gowun Batang", "AppleMyungjo", "Hoefler Text", Georgia,
+      "Apple SD Gothic Neo", serif;
+    --font-accent:
+      "Cormorant Garamond", "Hoefler Text", Didot, "Times New Roman", serif;
+    --display-letter-spacing: -0.01em;
+    --body-letter-spacing: 0em;
+    --body-line-height: 1.7;
+    --ui-text-transform: none;
+
+    /* Glow defaults — Heritage has no glow; Neon overrides in eras/neon.css */
+    --era-glow-text: none;
+    --era-glow-inverse: none;
+  }
+
+  body {
+    @apply antialiased text-gray-900;
+    font-family:
+      Pretendard,
+      -apple-system,
+      BlinkMacSystemFont,
+      system-ui,
+      Roboto,
+      "Helvetica Neue",
+      "Segoe UI",
+      "Apple SD Gothic Neo",
+      "Noto Sans KR",
+      "Malgun Gothic",
+      "Apple Color Emoji",
+      "Segoe UI Emoji",
+      "Segoe UI Symbol",
+      sans-serif;
+  }
+
+  /* Era surface activation.
+     When the host opts into the era system via [data-era] on <html>,
+     the page surface and ink adopt era values. Without this, era-aware
+     components (translucent fills, light Neon ink) sit on whatever the
+     host provides — which is white in Storybook and many app shells,
+     causing Neon-era text to disappear. Specificity (0,1,2) overrides
+     `body { @apply text-gray-900 }` above. */
+  :root[data-era] {
+    background: var(--era-surface-base);
+    color: var(--era-ink-primary);
+  }
+  :root[data-era] body {
+    background: var(--era-surface-base);
+    color: var(--era-ink-primary);
+  }
+
+  /* Respect user motion preferences — collapse era durations to 0
+     across :root AND every [data-era] selector so era overrides
+     don't win the cascade. Selectors are listed explicitly because
+     `[data-era]` is more specific than `:root`. */
+  @media (prefers-reduced-motion: reduce) {
+    :root,
+    :root[data-era="heritage"],
+    :root[data-era="neon"] {
+      --era-dur-fast: 0ms;
+      --era-dur-normal: 0ms;
+      --era-dur-slow: 0ms;
+    }
+  }
+}
+
+@layer utilities {
+  .hover\:scale-\[1\.01\]:hover {
+    transform: scale(1.01);
+  }
+  .hover\:scale-\[1\.02\]:hover {
+    transform: scale(1.02);
+  }
+  .active\:scale-\[0\.98\]:active {
+    transform: scale(0.98);
+  }
+
+  /* Era-aware text-transform — picks up var(--ui-text-transform).
+     None in Heritage, uppercase in Neon. */
+  .case-era {
+    text-transform: var(--ui-text-transform);
+  }
+
+  /* Era-aware borders using full border-shorthand variables.
+     Avoid `border-era-soft` Tailwind utility (color-only) when the
+     entire border declaration matters. */
+  .border-era {
+    border: var(--era-edge-soft);
+  }
+  .border-era-strong {
+    border: var(--era-edge-hard);
+  }
+  .border-era-seal {
+    border: var(--era-edge-seal);
+  }
+
+  /* Era-aware native <select> integration.
+     Native <option> elements live in browser-rendered chrome that almost
+     no CSS reaches reliably. The properties we apply below are the ones
+     verified to land in Chromium and Firefox; Safari mostly ignores them
+     for its native popup. The full design-system fidelity case is the
+     future Combobox component (TODO.md §F).
+
+     Strategy:
+       1. `color-scheme` is the strongest lever — Chromium and Firefox
+          render the native option panel as light or dark chrome based
+          on this hint, which is the most visible Heritage/Neon delta.
+       2. `select option { background-color, color }` is honoured by
+          Chromium and Firefox; ignored by Safari. We still apply it so
+          Heritage doesn't get a system-light panel rendered on top of
+          the era's parchment field, and Neon doesn't get a system-dark
+          panel that's slightly out of tune with the era's void surface.
+       3. `option:checked` background is honoured by Firefox only on the
+          closed select; Chromium's behaviour varies. We use the
+          accent-500 alpha so the highlight is on-brand wherever it lands. */
+  .select-era {
+    color-scheme: light;
+  }
+  :root[data-era="heritage"] .select-era {
+    color-scheme: light;
+  }
+  :root[data-era="heritage"] .select-era option {
+    background-color: var(--era-surface-raised);
+    color: var(--era-ink-primary);
+  }
+  :root[data-era="heritage"] .select-era option:checked {
+    background-color: rgb(var(--accent-500) / 0.18);
+    color: var(--era-ink-primary);
+  }
+  :root[data-era="neon"] .select-era {
+    color-scheme: dark;
+  }
+  :root[data-era="neon"] .select-era option {
+    background-color: var(--era-surface-base);
+    color: var(--era-ink-primary);
+  }
+  :root[data-era="neon"] .select-era option:checked {
+    background-color: rgb(var(--accent-500) / 0.28);
+    color: var(--era-ink-primary);
+  }
+}

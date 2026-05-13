@@ -1,0 +1,307 @@
+import { Meta } from "@storybook/blocks";
+
+<Meta title="Foundations/Era" />
+
+# Era — Heritage(과거) ↔ Neon(현대)
+
+The Oriental Design System ships with **two visual eras** that share the same
+component API. A `<Card>` is still a `<Card>`; what changes is the _material_
+it's printed on — hanji and ink-brush in **Heritage**, glass and neon trace in
+**Neon**.
+
+The era you choose is decoupled from the accent theme. Pick an era for the
+_atmosphere_; pick an accent for the _brand color_. They compose freely.
+
+> Companion visual swatches live in `Foundations/Colors` and
+> `Foundations/CSS Variables`. This page is the conceptual map.
+
+---
+
+## Why CSS variables (no React re-render)
+
+Era switching is a single attribute flip on `<html>`:
+
+```html
+<html data-era="heritage">
+  ...
+</html>
+<!-- becomes -->
+<html data-era="neon">
+  ...
+</html>
+```
+
+That attribute selector activates a different cascade of CSS custom
+properties. Every era-aware token resolves through `var(--era-…)`, so the
+browser repaints — but **React state never changes**. No component re-renders,
+no hydration mismatch, no `useTheme()` plumbing. The DOM tree is identical
+across eras.
+
+This is the load-bearing invariant: components read **semantic slots** like
+`--era-surface-base`, `--era-shadow-card`, `--font-display`. They never read
+physical values directly.
+
+---
+
+## The era contract
+
+```
+data-era="heritage"          data-era="neon"
+       │                            │
+       ▼                            ▼
+  CSS variable cascade         CSS variable cascade
+  (heritage.css)               (neon.css)
+       │                            │
+       └──────────┬─────────────────┘
+                  ▼
+       Tailwind era-aware utilities
+       bg-era-base · text-era-primary
+       shadow-era-card · duration-era
+       ease-era-brush · font-era-body
+                  │
+                  ▼
+       Components render unchanged
+```
+
+The contract has three layers:
+
+| Layer                  | Responsibility                                                                                                             |
+| ---------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `data-era` attribute   | The single switch. Selectors target `:root[data-era="heritage"]` and `:root[data-era="neon"]`.                             |
+| CSS variable cascade   | `src/styles/eras/{heritage,neon}.css` declare physical values. `applyEra()` mirrors them inline for runtime switching.     |
+| Tailwind era utilities | `tailwind.preset.ts` exposes `bg-era-*`, `text-era-*`, `shadow-era-*`, `duration-era`, `ease-era-brush`, `font-era-*` etc. |
+
+---
+
+## Public API
+
+```tsx
+import { applyEra, type EraName } from "@jyi/design-system";
+
+// Set era at app boot
+applyEra(document.documentElement, "heritage");
+
+// Toggle from a settings menu
+applyEra(document.documentElement, "neon");
+```
+
+The function does two things:
+
+1. Sets `element.dataset.era = name` (so CSS selectors activate).
+2. Inlines every variable from the era theme onto `element.style`, so the
+   change is visible even if the era stylesheet hasn't loaded yet.
+
+`EraName` is `"heritage" | "neon"`. There is no `"default"` era — if you call
+`applyEra` you must pick one.
+
+---
+
+## What flips across eras
+
+These tokens swap their physical values when `data-era` changes. Components
+that use the matching Tailwind utilities adapt automatically.
+
+| Slot                    | Heritage                            | Neon                                   |
+| ----------------------- | ----------------------------------- | -------------------------------------- |
+| `--era-surface-base`    | `#f6efe1` (warm hanji)              | `#0b0e18` (obsidian void)              |
+| `--era-surface-raised`  | `#fbf5e8` (lifted parchment)        | `rgba(255,255,255,0.06)` (glass)       |
+| `--era-surface-sunken`  | `#e7dcc4` (recessed pulp)           | `#06070d` (deep void)                  |
+| `--era-surface-overlay` | `rgba(44,30,17,0.55)` (umber wash)  | `rgba(4,8,22,0.6)` (cold dim)          |
+| `--era-ink-primary`     | `#2b1d10` (sumi ink)                | `#e8ecff` (neon white)                 |
+| `--era-ink-muted`       | `#6e5a3f` (faded sepia)             | `rgba(232,236,255,0.55)`               |
+| `--era-ink-inverse`     | `#fbf5e8` (parchment)               | `#0b0e18` (void)                       |
+| `--era-edge-color-soft` | `rgba(43,29,16,0.22)` (ink wash)    | `rgba(120,150,255,0.3)` (neon trace)   |
+| `--era-edge-color-hard` | `rgba(43,29,16,0.6)` (firm brush)   | `rgba(120,150,255,0.7)` (bright trace) |
+| `--era-shadow-card`     | paper depth (ink + soft drop)       | dual-ring neon glow                    |
+| `--era-shadow-modal`    | umber drop, no halo                 | full neon halo                         |
+| `--era-dur-normal`      | `380ms` (brush stroke pace)         | `220ms` (electronic snap)              |
+| `--era-ease-brush`      | `cubic-bezier(0.22, 0.61, 0.36, 1)` | `cubic-bezier(0.2, 0, 0, 1)`           |
+| `--font-display`        | Gowun Batang serif stack            | Orbitron geometric stack               |
+| `--font-body`           | Noto Serif KR stack                 | IBM Plex Sans KR stack                 |
+| `--ui-text-transform`   | `none`                              | `uppercase`                            |
+| `--era-accent-strong`   | `accent-700` (terracotta)           | `accent-300` (bright blue)             |
+
+Plus boardgame-specific slots (`--era-seal-ink`, `--era-dice-pip`,
+`--era-scroll-shadow`, `--era-card-back`, `--era-frame-ornament`) that drive
+the SealStamp / DiceRoll / ScrollReveal / CardDraw / Frame components.
+
+---
+
+## What stays static across eras
+
+The 오방색 (obangsaek) palette is **era-static**. These five cardinal hues are
+the cultural anchor of the system and read the same in both eras:
+
+| 오방색 axis     | Token group                         | Heritage usage                 | Neon usage                               |
+| --------------- | ----------------------------------- | ------------------------------ | ---------------------------------------- |
+| 청 (blue/green) | `secondary-*` (celadon), `indigo-*` | celadon vessels, hanbok indigo | same hue, brighter on dark surface       |
+| 황 (yellow)     | `gold-*`                            | sunlit ochre, royal accents    | same hue, glows on dark surface          |
+| 적 (red)        | `coral-*`, `oxblood-*`, `primary-*` | terracotta, seal ink           | identical anchors, dark-surface contrast |
+| 백 (white)      | `white`, parchment surfaces         | parchment is base              | inverted; white reserved for accent FG   |
+| 흑 (black)      | `black`, `gray-*`, ink              | sumi ink primary               | becomes foundation surface               |
+
+Only the `accent-*` palette (a CSS variable family) flips per era. Everything
+else stays put — meaning you can put `text-secondary-600` (celadon) on a card
+and trust it reads correctly in both eras without per-era overrides.
+
+---
+
+## Era-aware Tailwind utilities — quick reference
+
+| Utility                | Resolves to                     | When to reach for it                     |
+| ---------------------- | ------------------------------- | ---------------------------------------- |
+| `bg-era-base`          | `var(--era-surface-base)`       | Page / panel backgrounds                 |
+| `bg-era-raised`        | `var(--era-surface-raised)`     | Cards, popovers, modals                  |
+| `bg-era-sunken`        | `var(--era-surface-sunken)`     | Inset wells, inputs                      |
+| `bg-era-overlay`       | `var(--era-surface-overlay)`    | Modal backdrops                          |
+| `bg-era-pattern`       | `var(--era-material-pattern)`   | Decorative texture (porcelain ↔ circuit) |
+| `bg-era-grain`         | `var(--era-material-grain)`     | Heritage woodgrain, none in Neon         |
+| `bg-era-scanline`      | `var(--era-material-scanline)`  | Neon scanline, none in Heritage          |
+| `text-era-primary`     | `var(--era-ink-primary)`        | Default body / heading ink               |
+| `text-era-muted`       | `var(--era-ink-muted)`          | Captions, secondary text                 |
+| `text-era-inverse`     | `var(--era-ink-inverse)`        | Text on era-overlay surface only         |
+| `border-era-soft`      | `var(--era-edge-color-soft)`    | Default panel divider                    |
+| `border-era-hard`      | `var(--era-edge-color-hard)`    | Emphasized stroke (modal frame)          |
+| `border-era-seal`      | `var(--era-edge-color-seal)`    | Stamp / cartouche outline                |
+| `shadow-era-card`      | `var(--era-shadow-card)`        | Default card elevation                   |
+| `shadow-era-modal`     | `var(--era-shadow-modal)`       | Modal / dialog elevation                 |
+| `shadow-era-tooltip`   | `var(--era-shadow-tooltip)`     | Tooltip / popover halo                   |
+| `shadow-era-pressed`   | `var(--era-shadow-pressed)`     | Active / pressed inset                   |
+| `font-era-display`     | `var(--font-display)`           | Headings, hero text                      |
+| `font-era-body`        | `var(--font-body)`              | Body copy                                |
+| `font-era-accent`      | `var(--font-accent)`            | Decorative emphasis                      |
+| `tracking-era-display` | `var(--display-letter-spacing)` | Heading tracking                         |
+| `tracking-era-body`    | `var(--body-letter-spacing)`    | Body tracking                            |
+| `duration-era`         | `var(--era-dur-normal)`         | Default transition (380ms ↔ 220ms)       |
+| `duration-era-fast`    | `var(--era-dur-fast)`           | Quick state changes                      |
+| `duration-era-slow`    | `var(--era-dur-slow)`           | Reveal animations                        |
+| `ease-era-brush`       | `var(--era-ease-brush)`         | Default ease (brushstroke ↔ snap)        |
+| `ease-era-charge`      | `var(--era-ease-charge)`        | Charge-up curves                         |
+
+---
+
+## Storybook integration
+
+This Storybook exposes a top-bar toolbar control labelled **Era** with three
+options:
+
+- **Default (no era)** — strips `data-era`. Components render with whatever
+  baseline values your `globals.css` provides. Useful for verifying that a
+  component still works without the era layer applied.
+- **Heritage (과거)** — calls `applyEra(documentElement, "heritage")`.
+- **Neon (현대)** — calls `applyEra(documentElement, "neon")`.
+
+The toolbar globalType is wired in `.storybook/preview.ts`. Switching it
+also updates the addon-backgrounds value so the canvas paints the matching
+era surface (`#f6efe1` for Heritage, `#0b0e18` for Neon).
+
+When you build a story for a component that should adapt to era, render it
+once and rely on the toolbar to verify both eras. You should not need
+era-specific story variants except for cases where the _content_ changes
+(see the EraSwitch component for those scenarios).
+
+---
+
+## Code recipes
+
+### Set era at app boot
+
+```tsx
+// main.tsx
+import { applyEra } from "@jyi/design-system";
+import "@jyi/design-system/styles";
+import "@jyi/design-system/styles/eras/heritage";
+import "@jyi/design-system/styles/eras/neon";
+
+applyEra(document.documentElement, "heritage");
+```
+
+### Persist era preference
+
+```tsx
+import { applyEra, type EraName } from "@jyi/design-system";
+
+const STORAGE_KEY = "oriental:era";
+
+export function bootEra(): void {
+  const saved = (localStorage.getItem(STORAGE_KEY) as EraName) || "heritage";
+  applyEra(document.documentElement, saved);
+}
+
+export function setEra(name: EraName): void {
+  applyEra(document.documentElement, name);
+  localStorage.setItem(STORAGE_KEY, name);
+}
+```
+
+### Per-region era override
+
+`applyEra()` accepts any element, not just `documentElement`. Use this when a
+single page wants a Heritage frame around a Neon embed, or vice versa.
+
+```tsx
+import { applyEra } from "@jyi/design-system";
+import { useEffect, useRef } from "react";
+
+export function NeonRegion({ children }: { children: React.ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (ref.current) applyEra(ref.current, "neon");
+  }, []);
+  return <div ref={ref}>{children}</div>;
+}
+```
+
+Inner elements inherit the local `data-era`, so all era-aware utilities
+inside the region resolve to Neon values — even if `<html>` is Heritage.
+
+### Era-aware override pattern (arbitrary variant)
+
+For component-specific tweaks that only fire under one era, use the
+`[[data-era=neon]_&]:` arbitrary variant. This targets the component when
+_any_ ancestor (including `<html>`) carries `data-era="neon"`.
+
+```tsx
+<button
+  className={cn(
+    "bg-era-raised text-era-primary shadow-era-card",
+    // Heritage: nothing extra. Neon: add a faint cyan rim light on hover.
+    "[[data-era=neon]_&]:hover:shadow-[0_0_18px_rgba(120,150,255,0.5)]",
+  )}
+>
+  Roll the dice
+</button>
+```
+
+The pattern is preferred over `useEra()` hooks because it stays declarative
+and survives SSR.
+
+---
+
+## Era and OS dark mode
+
+Era IS the project's color-scheme axis: Heritage is the light scheme (warm
+hanji surface, sumi ink) and Neon is the dark scheme (obsidian void, neon
+glow). The system intentionally treats `prefers-color-scheme: dark` as a
+boot-time _hint_ for picking an initial era — never as an orthogonal axis
+that combines with era. There is no Heritage-dark or Neon-light variant; era
+swap is the dark-mode swap. Full rationale, trade-offs, and follow-up
+patterns (boot hint, `color-scheme` meta) live in
+**[`docs/reference/DARK_MODE_AND_ERA.md`](../docs/reference/DARK_MODE_AND_ERA.md)**.
+
+---
+
+## Cross-reference
+
+- **`Foundations/Colors`** — visual swatches for the obangsaek palette and
+  era-aware accent flip
+- **`Foundations/CSS Variables`** — live dump of every `--era-*` variable for
+  the currently selected era
+- **`Foundations/Tokens`** — narrative tokens-first guide, including the
+  `--era-accent-strong` rationale
+- **`Components/EraSwitch`** — declarative wrapper that renders different
+  children per era
+- **`docs/reference/ERA_THEME_DESIGN.md`** — the original architecture spec
+  (Korean), preserved as the source of truth for design intent
+- **`docs/reference/DARK_MODE_AND_ERA.md`** — decision record for how era
+  relates to OS-level dark mode (Option A: era is the color-scheme axis)

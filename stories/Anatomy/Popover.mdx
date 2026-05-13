@@ -1,0 +1,286 @@
+import { Meta } from "@storybook/blocks";
+
+<Meta title="Anatomy/Popover" />
+
+# Popover — anatomy, do/don't, spec
+
+`Popover` is the system's **non-modal** contextual surface — it floats
+above the page, can be dismissed without making a decision, and never
+locks body scroll. Use it for inline supplementary content: filter
+detail, mention previews, contextual help. For interruptive flows that
+require a user response, reach for
+[`Modal`](?path=/docs/anatomy-modal--docs) instead.
+
+This page documents the visual decomposition, prop contract, common
+usage patterns, and the keyboard / focus / motion / a11y spec the
+component honours.
+
+---
+
+## Anatomy
+
+The Popover is a positioned panel anchored to a trigger element. It
+renders inline (not via Portal), so it inherits the trigger's stacking
+context but escapes via `z-popover`.
+
+```
+        ② Trigger (cloneElement)
+        ┌──────────┐
+        │ [Filter] │  aria-expanded, aria-haspopup="dialog",
+        └────┬─────┘  aria-controls={panelId}
+             │
+        ┌────▼──────────────────────────┐
+        │ ① Wrap (relative inline-block)│
+        │   ┌───────────────────────┐   │
+        │   │ ③ Panel (role=dialog) │   │
+        │   │   ┌─────────────────┐ │   │
+        │   │   │ ④ Content       │ │   │
+        │   │   └─────────────────┘ │   │
+        │   └───────────────────────┘   │
+        └───────────────────────────────┘
+```
+
+| Part | Role / class                                   | Source                                                         |
+| ---- | ---------------------------------------------- | -------------------------------------------------------------- |
+| ①    | `<span>` `popoverWrap` (`relative inline-block`)| `Popover.tsx` — anchors panel positioning, hosts outside-click detection |
+| ②    | Cloned trigger element                          | `cloneElement(trigger, …)` — receives `onClick`, `aria-expanded`, `aria-haspopup`, `aria-controls`, merged `ref` |
+| ③    | `<div>` `role="dialog"`, `tabIndex={-1}`        | `popoverPanelStyles` — absolute, era-raised, era-modal shadow  |
+| ④    | `content` ReactNode                             | Caller-owned content. Can include focusable controls.          |
+
+The panel uses absolute positioning relative to ① (the wrap), so it
+follows the trigger as the page scrolls. Placement is one of four
+corner alignments — see `placement` prop below.
+
+---
+
+## Props
+
+The full autodocs prop table is at
+[`Components/Popover`](?path=/docs/components-popover--docs).
+
+### Anchor
+
+| Prop      | Type                                  | Notes                                                |
+| --------- | ------------------------------------- | ---------------------------------------------------- |
+| `trigger` | `ReactElement<TriggerProps>`          | Required. Receives `onClick`, ARIA attrs, and merged `ref` via `cloneElement`. |
+| `content` | `ReactNode`                           | Required. Rendered inside the panel.                 |
+
+### State
+
+| Prop           | Type                          | Notes                                              |
+| -------------- | ----------------------------- | -------------------------------------------------- |
+| `open`         | `boolean`                     | Optional — pass to operate in controlled mode.     |
+| `defaultOpen`  | `boolean`                     | Initial open state for uncontrolled usage.         |
+| `onOpenChange` | `(open: boolean) => void`     | Fires on every open/close (both modes).            |
+
+When `open` is provided, the component is **controlled** — its
+internal `useState` is bypassed and the consumer owns the value.
+Otherwise it's uncontrolled and `defaultOpen` seeds the initial state.
+
+### Layout
+
+| Prop        | Type                                                              | Default          | Notes                              |
+| ----------- | ----------------------------------------------------------------- | ---------------- | ---------------------------------- |
+| `placement` | `"bottom-start" \| "bottom-end" \| "top-start" \| "top-end"`     | `"bottom-start"` | Absolute corner alignment.         |
+| `className` | `string`                                                          | —                | Applied to the wrap (`<span>`).    |
+
+### Focus
+
+| Prop              | Type                              | Notes                                                                |
+| ----------------- | --------------------------------- | -------------------------------------------------------------------- |
+| `initialFocusRef` | `RefObject<HTMLElement \| null>`  | Optional explicit focus target on open. Defaults to the first focusable descendant; falls back to the panel itself. |
+
+---
+
+## Do
+
+### Pass a `<Button>` (or any focusable element) as the trigger
+
+```tsx
+<Popover
+  trigger={<Button variant="outline">필터</Button>}
+  content={<FilterPanel />}
+  placement="bottom-end"
+/>
+```
+
+The trigger is cloned with `cloneElement`, so it must be a single
+React element that accepts `onClick`, `ref`, and the ARIA attributes.
+Native `<button>` and the system `<Button>` both work out of the box.
+
+### Use controlled mode for cross-surface coordination
+
+```tsx
+const [open, setOpen] = useState(false);
+
+<Popover
+  open={open}
+  onOpenChange={setOpen}
+  trigger={<Button>옵션</Button>}
+  content={
+    <Stack>
+      <Button onClick={() => { doThing(); setOpen(false); }}>
+        실행
+      </Button>
+    </Stack>
+  }
+/>
+```
+
+Controlled mode gives you a programmatic close — useful when an action
+inside the panel finishes and the popover should dismiss without a
+click-outside.
+
+### Pin focus to the most useful field with `initialFocusRef`
+
+```tsx
+const inputRef = useRef<HTMLInputElement>(null);
+
+<Popover
+  trigger={<Button>검색</Button>}
+  initialFocusRef={inputRef}
+  content={<input ref={inputRef} placeholder="검색어 입력" />}
+/>
+```
+
+When the panel contains a primary input, pin focus there — saves the
+user a Tab press and matches the inline-search pattern.
+
+### Position with `placement` based on screen edge
+
+```tsx
+<Popover
+  trigger={<IconButton>⋯</IconButton>}
+  placement="bottom-end"
+  content={<MenuList />}
+/>
+```
+
+Trigger near the right edge → `bottom-end`. Near the bottom edge →
+`top-start`. The component does not auto-flip, so pick the placement
+that keeps the panel inside the viewport at the trigger's position.
+
+---
+
+## Don't
+
+### Don't use Popover for interruptive flows
+
+If the user must answer before continuing — destructive confirmations,
+critical errors, blocking forms — use
+[`Modal`](?path=/docs/anatomy-modal--docs). Popover is dismissible by
+clicking literally anywhere outside; it cannot enforce a decision.
+
+### Don't pass a Fragment or array as `trigger`
+
+```tsx
+<Popover trigger={<><Icon /> Filter</>} content={…} />
+```
+
+`cloneElement` requires a single React element. Wrap multi-child
+content in a single `<Button>` (or other element) so the ref/ARIA
+attributes have somewhere to land.
+
+### Don't render a Popover inside a Modal's footer
+
+Popover content escapes the modal's focus trap because it's an inline
+panel, not a portal. Mixing the two breaks the trap contract: a
+focused element inside the popover satisfies `panel.contains(active)`
+because the popover is still inside the modal panel — but Tab order
+becomes confusing for keyboard users. If you need a sub-surface inside
+a modal, render a nested `Modal` (the body-scroll counter handles it)
+or expand the parent modal's content.
+
+### Don't animate opacity in the entry keyframe
+
+The `popover-enter` keyframe is **transform-only** (`scale: 0.97 → 1`)
+because Wave 5b2 / Wave 6a found 18 axe color-contrast failures across
+5 stories when opacity ramped from 0 to 1. The mid-frame sample showed
+text below AA. The keyframe is injected once via
+`oriental-popover-keyframes`; do not override it.
+
+### Don't expect auto-flip placement
+
+The placement map is static — the component does not measure viewport
+collision. If your trigger lives near a viewport edge, choose the
+placement explicitly. Auto-flip would require a positioning engine
+(Floating UI / Popper) which the system has not yet adopted.
+
+---
+
+## Spec
+
+### Keyboard
+
+| Key            | Behaviour                                                                   |
+| -------------- | --------------------------------------------------------------------------- |
+| `Escape`       | Closes the panel (`document`-level listener, `e.stopPropagation()` so it doesn't bubble to a wrapping modal). Wave 5b2 fixed this — previously a no-op. |
+| `Tab`          | Moves through focusables inside the panel, then leaves naturally to the next focusable in the document. The component does **not** trap focus — that's an intentional non-modal contract. |
+| `Shift+Tab`    | Reverse of Tab.                                                             |
+
+### Focus management
+
+- **On open** — captures `document.activeElement` (or the trigger
+  element ref as fallback) into `previouslyFocusedRef`, then defers
+  one microtask (`queueMicrotask`) before moving focus to:
+  1. `initialFocusRef.current`, if provided;
+  2. else the first focusable descendant via `getFirstFocusable`;
+  3. else the panel itself (`tabIndex={-1}`).
+- **On close** — focus restores to `triggerElementRef.current` (the
+  cloned trigger's underlying DOM node), then falls back to
+  `previouslyFocusedRef.current` if the trigger has unmounted.
+- The component tracks transitions via `wasOpenRef`, so
+  remount-without-state-change does not re-trigger the on-open path.
+
+### Click-outside
+
+A `mousedown` listener on `document` checks
+`!wrapRef.current?.contains(e.target as Node)`. If the click landed
+outside the wrap (`<span>` containing trigger and panel), the popover
+closes via `setOpen(false)` — which fires `onOpenChange` even in
+uncontrolled mode.
+
+### Body scroll lock
+
+**No.** Popover is non-modal — the page underneath stays interactive
+and scrollable. If you need a scroll lock, that's a Modal, not a
+Popover.
+
+### `role`
+
+`role="dialog"` on the panel. Combined with the trigger's
+`aria-haspopup="dialog"`, this advertises a non-modal dialog
+(no `aria-modal` set, intentionally — `aria-modal="true"` is reserved
+for actual modal flows). Screen readers announce "dialog" without
+treating the rest of the page as inert.
+
+### Motion
+
+- Panel entry: `motion-safe:animate-[popover-enter_200ms_ease-out_both]`.
+- Keyframe: `@keyframes popover-enter { from { transform: scale(0.97); } to { transform: scale(1); } }`.
+- Opacity is held at `1` throughout — see the inline comment in
+  `Popover.styles.ts` for the Wave 6a regression history.
+- Wrapped in `motion-safe:`, so `prefers-reduced-motion: reduce`
+  consumers get an instant render.
+
+### A11y contract
+
+- Trigger receives `aria-expanded={open}`, `aria-haspopup="dialog"`,
+  `aria-controls={panelId}` automatically via `cloneElement`. Whatever
+  ARIA the consumer set on the trigger is overwritten by these three
+  values — that's intentional, the component owns the relationship.
+- Panel has a stable id from `useId()` so `aria-controls` can resolve
+  it before mount.
+- `aria-modal` is **not** set — Popover is non-modal.
+- Outside content is **not** marked inert. Users can interact with the
+  page while the popover is open; clicking anywhere outside closes it.
+
+---
+
+## Cross-references
+
+- [`Components/Popover`](?path=/docs/components-popover--docs) — autodocs, full prop table, all stories
+- [`Anatomy/Modal`](?path=/docs/anatomy-modal--docs) — interruptive sibling for blocking flows
+- [`Anatomy/DropdownMenu`](?path=/docs/anatomy-dropdownmenu--docs) — `role="menu"` for action lists (often hosted inside a Popover)
+- [`Foundations/Accessibility`](?path=/docs/foundations-accessibility--docs) — focus restoration and ARIA patterns
+- WAI-ARIA Authoring Practices — [Dialog (Modal) pattern](https://www.w3.org/WAI/ARIA/apg/patterns/dialog-modal/) (the non-modal variant is documented in the same page)

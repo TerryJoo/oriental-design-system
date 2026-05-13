@@ -1,0 +1,153 @@
+{
+  "name": "@jyi/design-system",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Oriental design system with Heritage/Neon dual-era theming for React and Tailwind CSS",
+  "author": "yungikjoo",
+  "license": "MIT",
+  "sideEffects": ["**/*.css"],
+  "engines": { "node": ">=18" },
+  "publishConfig": {
+    "access": "restricted",
+    "registry": "https://npm.pkg.github.com"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/TerryJoo/oriental-design-system.git"
+  },
+  "homepage": "https://terryjoo.github.io/oriental-design-system/",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./core": {
+      "types": "./dist/core.d.ts",
+      "import": "./dist/core.js"
+    },
+    "./react": {
+      "types": "./dist/react.d.ts",
+      "import": "./dist/react.js"
+    },
+    "./tailwind-preset": {
+      "import": {
+        "types": "./dist/tailwind.preset.d.ts",
+        "default": "./dist/tailwind.preset.js"
+      },
+      "require": {
+        "types": "./dist/tailwind.preset.d.cts",
+        "default": "./dist/tailwind.preset.cjs"
+      }
+    },
+    "./styles": "./dist/styles.css",
+    "./styles/eras/heritage": "./dist/eras/heritage.css",
+    "./styles/eras/neon": "./dist/eras/neon.css"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "dev": "storybook dev -p 6006",
+    "build": "tsup && mkdir -p dist/eras && cp src/styles/globals.css dist/styles.css && cp src/styles/eras/heritage.css dist/eras/heritage.css && cp src/styles/eras/neon.css dist/eras/neon.css",
+    "build:storybook": "storybook build",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src --ext .ts,.tsx",
+    "lint:fix": "eslint src --ext .ts,.tsx --fix",
+    "format": "prettier --write \"src/**/*.{ts,tsx}\" \"stories/**/*.{ts,tsx}\"",
+    "format:check": "prettier --check \"src/**/*.{ts,tsx}\" \"stories/**/*.{ts,tsx}\"",
+    "pack:check": "publint && attw --pack . --ignore-rules no-resolution cjs-resolves-to-esm missing-export-equals",
+    "prepublishOnly": "npm run typecheck && npm run lint && npm run format:check && npm run test && npm run build && npm run pack:check",
+    "gen:story": "tsx scripts/gen-story.ts",
+    "test-storybook": "cross-env NODE_OPTIONS=--dns-result-order=ipv4first test-storybook --url http://127.0.0.1:6006",
+    "test-storybook:ci": "concurrently -k -s first -n SB,TEST -c magenta,blue \"npm run build:storybook --silent && http-server storybook-static --port 6006 -a 127.0.0.1 --silent\" \"wait-on tcp:127.0.0.1:6006 && node scripts/run-a11y-suite.mjs\"",
+    "test-storybook:report": "node scripts/build-a11y-baseline.mjs",
+    "test-storybook:visual": "concurrently -k -s first -n SB,VIS -c magenta,cyan \"npm run build:storybook --silent && http-server storybook-static --port 6006 -a 127.0.0.1 --silent\" \"wait-on tcp:127.0.0.1:6006 && node scripts/run-visual-suite.mjs --update\"",
+    "test-storybook:visual:ci": "concurrently -k -s first -n SB,VIS -c magenta,cyan \"npm run build:storybook --silent && http-server storybook-static --port 6006 -a 127.0.0.1 --silent\" \"wait-on tcp:127.0.0.1:6006 && node scripts/run-visual-suite.mjs\""
+  },
+  "peerDependencies": {
+    "react": ">=18.0.0",
+    "react-dom": ">=18.0.0",
+    "tailwindcss": ">=3.4.0"
+  },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": true
+    },
+    "react-dom": {
+      "optional": true
+    }
+  },
+  "dependencies": {
+    "@fontsource/cormorant-garamond": "^5.2.11",
+    "@fontsource/gowun-batang": "^5.2.8",
+    "@fontsource/ibm-plex-sans-kr": "^5.2.8",
+    "@fontsource/jetbrains-mono": "^5.2.8",
+    "@fontsource/noto-serif-kr": "^5.2.9",
+    "@fontsource/orbitron": "^5.2.8",
+    "@fontsource/pretendard": "^5.2.5",
+    "clsx": "^2.1.1",
+    "tailwind-merge": "^2.5.5"
+  },
+  "devDependencies": {
+    "@arethetypeswrong/cli": "^0.17.0",
+    "@eslint/js": "^9.17.0",
+    "@storybook/addon-a11y": "^8.4.7",
+    "@storybook/addon-essentials": "^8.4.7",
+    "@storybook/addon-interactions": "^8.4.7",
+    "@storybook/addon-links": "^8.4.7",
+    "@storybook/blocks": "^8.4.7",
+    "@storybook/react": "^8.4.7",
+    "@storybook/react-vite": "^8.4.7",
+    "@storybook/test": "^8.4.7",
+    "@storybook/test-runner": "^0.21.3",
+    "@testing-library/jest-dom": "^6.6.3",
+    "@testing-library/react": "^16.1.0",
+    "@types/node": "^22.10.2",
+    "@types/react": "^18.3.17",
+    "@types/react-dom": "^18.3.5",
+    "@typescript-eslint/eslint-plugin": "^8.18.2",
+    "@typescript-eslint/parser": "^8.18.2",
+    "@vitejs/plugin-react": "^4.3.4",
+    "@vitest/coverage-v8": "^2.1.8",
+    "autoprefixer": "^10.4.20",
+    "axe-playwright": "^2.2.2",
+    "concurrently": "^9.2.1",
+    "cross-env": "^7.0.3",
+    "eslint": "^9.17.0",
+    "eslint-plugin-react": "^7.37.2",
+    "eslint-plugin-react-hooks": "^5.1.0",
+    "globals": "^17.0.0",
+    "happy-dom": "^15.11.7",
+    "http-server": "^14.1.1",
+    "postcss": "^8.4.49",
+    "prettier": "^3.4.2",
+    "publint": "^0.3.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "storybook": "^8.4.7",
+    "tailwindcss": "^3.4.17",
+    "tsup": "^8.3.5",
+    "tsx": "^4.21.0",
+    "typescript": "^5.7.2",
+    "vite": "^6.0.6",
+    "vitest": "^2.1.8",
+    "wait-on": "^8.0.5"
+  },
+  "keywords": [
+    "design-system",
+    "tailwindcss",
+    "react",
+    "storybook",
+    "ui-components",
+    "oriental",
+    "heritage",
+    "neon",
+    "era-theme"
+  ]
+}

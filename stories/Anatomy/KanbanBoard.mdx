@@ -1,0 +1,369 @@
+import { Meta } from "@storybook/blocks";
+
+<Meta title="Anatomy/KanbanBoard" />
+
+# KanbanBoard — Anatomy, Do·Don't, Spec
+
+`KanbanBoard` is the canonical multi-column drag-and-drop board in the
+Oriental Design System. It supports both pointer drag-and-drop (HTML5
+DnD) and a **full keyboard reorder pattern** — Space/Enter to grab,
+Arrow keys to move (including cross-column with `ArrowLeft` /
+`ArrowRight`, RTL-aware via `useDir()`), Escape to cancel — with a
+`role="status" aria-live="polite"` region announcing every grab / move
+/ drop / cancel for assistive tech.
+
+This page is the contract: the visual / structural parts, the keyboard
+state machine, the empty-state slots (board-level + per-column), and
+the patterns that go wrong when consumers reach beyond the supplied
+props.
+
+---
+
+## Anatomy
+
+```
+Loaded board (columns.length > 0):
+
+┌─────────────────────────────────────────────────────────────┐
+│  ┌── BACKLOG ──┐  ┌── IN PROGRESS ──┐  ┌── DONE ──────┐     │ ← columns (grid)
+│  │ ┌─────────┐ │  │ ┌──────────────┐│  │ ┌──────────┐ │     │
+│  │ │ Card A  │ │  │ │ Card C       ││  │ │ Card E   │ │     │ ← <li role="listitem">
+│  │ └─────────┘ │  │ └──────────────┘│  │ └──────────┘ │     │   tabIndex=0, draggable
+│  │ ┌─────────┐ │  │ ┌──────────────┐│  │              │     │
+│  │ │ Card B  │ │  │ │ Card D ▣     ││  │              │     │ ← grabbed = ring + tint
+│  │ └─────────┘ │  │ └──────────────┘│  │              │     │
+│  └─────────────┘  └─────────────────┘  └──────────────┘     │
+└─────────────────────────────────────────────────────────────┘
+                                                                 ← <div role="status"
+                                                                    aria-live="polite">
+                                                                   "Picked up Card D
+                                                                    from In Progress…"
+                                                                   (visually hidden)
+
+Board-level empty (columns.length === 0):
+
+┌─────────────────────────────────────────────────────────────┐
+│       ┌─────────────────────────────────────────────┐       │
+│       │            보드가 비어 있습니다              │       │ ← <EmptyState> via
+│       │       컬럼을 추가하면 카드를 정리…           │       │   emptyState? slot
+│       └─────────────────────────────────────────────┘       │   data-testid=
+│                                                             │   "kanban-board-empty"
+└─────────────────────────────────────────────────────────────┘
+```
+
+| Part            | Element                                                | Role / attributes                                                                       |
+| --------------- | ------------------------------------------------------ | --------------------------------------------------------------------------------------- |
+| **Root**        | `<div>` (or empty wrapper)                             | Forwards ref; grid template `repeat(N, minmax(0,1fr))` when loaded                      |
+| **Column**      | `<div data-column-id={id}>`                            | Drop target (HTML5 DnD); era-aware sunken card, `min-h-[160px]`                         |
+| **Column header** | `<h5 id={…}>`                                        | Headline; the column `<ul>` references it via `aria-labelledby`                         |
+| **Card list**   | `<ul role="list" aria-labelledby={…} aria-label={…}>` | Wave 5b2 change: explicit `role="list"` (was implicit `<ul>`)                           |
+| **Card**        | `<li role="listitem" tabIndex={0} draggable>`          | `aria-roledescription="draggable card"`; `data-grabbed="true"` while grabbed            |
+| **Live region** | `<div role="status" aria-live="polite" aria-atomic="true">` | Visually-hidden announcement region; reads grab/move/drop/cancel events            |
+| **Empty wrap**  | `<div data-testid="kanban-board-empty">`               | Rendered only when `columns.length === 0`; hosts `emptyState` (defaults to `<EmptyState>`) |
+
+Per-column empty rendering is unchanged: a column with zero cards still
+shows its header + a `min-h-[160px]` body so it remains a valid drop
+target for the first card. The `emptyState?` slot fires **only** at
+the board level (zero columns).
+
+---
+
+## Props
+
+| Prop          | Type                                                                | Default       | Notes                                                                                                                              |
+| ------------- | ------------------------------------------------------------------- | ------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| `columns`     | `ReadonlyArray<KanbanColumnData>` **(required)**                    | —             | `{ id, title, cards, ariaLabel? }`. `id` must be unique.                                                                          |
+| `onMove`      | `(cardId: string, fromColId: string, toColId: string) => void`      | —             | Fires on drag-end **and** keyboard drop, only when the card actually changed columns.                                              |
+| `liveRegion`  | `"polite" \| "assertive" \| "off"`                                  | `"polite"`    | Politeness level for the AT announcement region. `"off"` suppresses announcements entirely.                                        |
+| `emptyState`  | `ReactNode`                                                         | `<EmptyState title="보드가 비어 있습니다" description="…" />` | Board-level empty (only when `columns.length === 0`).                       |
+| `className`   | `string`                                                            | —             | Composed onto the root.                                                                                                            |
+| native attrs  | `HTMLAttributes<HTMLDivElement>`                                    | —             | All native `<div>` attrs pass through.                                                                                             |
+
+`KanbanColumnData`:
+
+```ts
+interface KanbanColumnData {
+  id: string;
+  title: ReactNode;
+  cards: ReadonlyArray<KanbanCardData>;
+  ariaLabel?: string;  // plain-text label for AT (falls back to title or id)
+}
+```
+
+`KanbanCardData`:
+
+```ts
+interface KanbanCardData {
+  id: string;
+  content: ReactNode;
+  ariaLabel?: string;  // plain-text label for AT announcements
+}
+```
+
+See **`Components/KanbanBoard`** for the autodocs prop table.
+
+---
+
+## Do
+
+### Do — supply `ariaLabel` when `content` is JSX
+
+```tsx
+<KanbanBoard
+  columns={[
+    {
+      id: "in-progress",
+      title: "진행 중",
+      cards: [
+        {
+          id: "card-1",
+          content: (
+            <span className="flex items-center gap-1.5">
+              <FlagIcon /> Migrate billing API <Tag size="sm">P0</Tag>
+            </span>
+          ),
+          ariaLabel: "Migrate billing API, P0",
+        },
+      ],
+    },
+  ]}
+/>
+```
+
+Live-region announcements need a clean string label. When `content` is
+a `ReactNode` with icons + JSX, the component cannot infer one — pass
+`ariaLabel`. Without it, the announcement falls back to the card `id`,
+which reads as gibberish for screen-reader users.
+
+### Do — wire `onMove` to your data store
+
+```tsx
+const [board, setBoard] = useState(initialBoard);
+
+<KanbanBoard
+  columns={board}
+  onMove={(cardId, fromColId, toColId) => {
+    setBoard((prev) => moveCardBetweenColumns(prev, cardId, fromColId, toColId));
+  }}
+/>;
+```
+
+The component keeps a local "preview" order so keyboard moves can
+shuffle cards without waiting for a re-feed, but it re-syncs from the
+prop whenever the column-id + ordered-card-id signature changes. Wire
+`onMove` to your real data and feed the new `columns` back in — the
+component handles the rest.
+
+### Do — customise the board-level empty state when needed
+
+```tsx
+{/* No-data context — leave the default Korean copy */}
+<KanbanBoard columns={[]} />
+
+{/* Onboarding context — show an action */}
+<KanbanBoard
+  columns={[]}
+  emptyState={
+    <EmptyState
+      title="첫 컬럼을 추가하세요"
+      description="할 일을 정리할 첫 보드를 만들어 보세요."
+      actions={<Button onClick={createColumn}>컬럼 추가</Button>}
+    />
+  }
+/>
+```
+
+The slot fires only when `columns.length === 0`. A board with columns
+but no cards is **not** empty — see "Don't" below. See
+**`Patterns/Empty States`** for the cross-component contract.
+
+### Do — leave per-column empties as drop targets
+
+```tsx
+<KanbanBoard
+  columns={[
+    { id: "todo", title: "할 일", cards: [] },         // empty column
+    { id: "doing", title: "진행 중", cards: [card1] },
+  ]}
+/>
+```
+
+Each empty column keeps its header + a `min-h-[160px]` body so it
+remains a valid drop target for the first card. Do not filter empty
+columns out — they are part of the board's structure and the user
+expects to drop into them.
+
+### Do — set `liveRegion="off"` only when the board is purely visual
+
+```tsx
+{/* Read-only "kanban diagram" with no interaction → suppress announcements */}
+<KanbanBoard columns={readOnlyBoard} liveRegion="off" />
+```
+
+The default `"polite"` is correct for any board where users can grab,
+move, or drop cards. Only suppress when the board is non-interactive
+and the announcements would be noise. Never use `"assertive"` for
+ordinary reorder events — it interrupts other speech.
+
+---
+
+## Don't
+
+### Don't — show a board-level empty when columns have no cards
+
+```tsx
+{/* ❌ Wrong — this hides drop targets the user needs. */}
+{board.every((col) => col.cards.length === 0)
+  ? <EmptyState title="비어 있습니다" />
+  : <KanbanBoard columns={board} />}
+```
+
+A board with columns and zero cards is **not** empty — it is a usable
+surface waiting for the first card. The empty-board slot is
+specifically for `columns.length === 0`. Render the board even when
+every column is empty; the per-column `min-h-[160px]` body keeps the
+drop targets visible.
+
+### Don't — wire your own keyboard handler to the cards
+
+```tsx
+{/* ❌ Wrong — duplicates / conflicts with the built-in grab/move/drop state machine. */}
+<KanbanBoard
+  columns={cols}
+  onKeyDown={(e) => { if (e.key === "ArrowUp") ... }}
+/>
+```
+
+The component owns the grab/move/drop state machine, the `data-grabbed`
+visual indicator, the live-region announcements, the cross-column RTL
+direction logic, and the focus restoration after each move. Hand-rolled
+keyboard handlers lose all of these. If the existing state machine
+does not cover your use case, file an issue — do not fork it.
+
+### Don't — feed `<button>` or other interactive elements as `content`
+
+```tsx
+{/* ❌ Wrong — a focusable button inside a tabIndex=0 <li> creates a focus trap. */}
+{ id: "card-1", content: <button onClick={...}>Open detail</button> }
+```
+
+Cards are focusable (`tabIndex=0`) so users can grab them with the
+keyboard. Nesting another focusable element inside breaks the grab
+gesture (Space/Enter activates the inner button instead) and creates
+two tab stops per card. If you need an action on the card, surface it
+in a separate column or in a side panel keyed off card focus.
+
+### Don't — invert `ArrowLeft` / `ArrowRight` under RTL yourself
+
+```tsx
+{/* ❌ Wrong — the component already handles RTL via useDir(). */}
+const isRtl = document.dir === "rtl";
+const dir = isRtl ? "ArrowLeft" : "ArrowRight";
+```
+
+The component reads `dir` via `useDir()` and inverts the keys
+internally so `ArrowRight` always advances **toward the inline-end
+side** (next column in the data array) regardless of writing
+direction. Trust this — overriding it inverts the inversion.
+
+### Don't — assume `onMove` fires on same-column drops
+
+```tsx
+<KanbanBoard
+  columns={cols}
+  onMove={(id, from, to) => {
+    // This will NOT be called when a card is reordered within the same column.
+    saveReorder(id, from, to);
+  }}
+/>
+```
+
+`onMove` only fires when the card actually changed columns. Within-column
+reordering happens entirely in local state (the live preview). If you
+need to persist within-column order, capture it in a different way —
+e.g. a separate `onReorder?: (colId, cardIds) => void` is on the
+roadmap but not yet shipped.
+
+---
+
+## Spec — keyboard / focus / motion / a11y contract
+
+### Keyboard
+
+When focus is on a card (`<li tabIndex={0}>`):
+
+| Key                            | Behaviour                                                                                                  |
+| ------------------------------ | ---------------------------------------------------------------------------------------------------------- |
+| `Space` / `Enter`              | **Grab** the card (no active grab) or **drop** it (this card is grabbed). Announces grab / drop.           |
+| `Escape`                       | **Cancel** the grab and restore the pre-grab order. Announces cancel. Re-focuses the card on its origin.   |
+| `ArrowUp` (while grabbed)      | Move the card one slot up within its current column. Announces new position.                               |
+| `ArrowDown` (while grabbed)    | Move the card one slot down within its current column. Announces new position.                             |
+| `ArrowRight` (while grabbed)   | **Logical next column** — advances toward the inline-end side. Same physical key under LTR; swaps under RTL. |
+| `ArrowLeft` (while grabbed)    | **Logical previous column** — advances toward the inline-start side. Same physical key under LTR; swaps under RTL. |
+
+State machine: `idle` → (`Space`/`Enter`) → `grabbed` → (`Arrow*`) → `grabbed` (re-positioned) → (`Space`/`Enter`) → `idle` (drop fires `onMove` if column changed). `Escape` from `grabbed` returns to `idle` with the original order restored.
+
+### Focus
+
+- Cards are `tabIndex={0}` so the tab sequence walks card → card →
+  card. (Wave 5b2 change: previously cards were not focusable.)
+- After every keyboard move, focus is restored to the moved card via
+  `queueMicrotask` so subsequent Arrow presses keep flowing through
+  the same card across DOM reorders.
+- After `Escape`, focus returns to the card on its original spot.
+- Focus ring: `ring-2 ring-[rgb(var(--accent-500))]` — visible on both
+  eras.
+- Active grab adds `ring-2 ring-[rgb(var(--accent-500))] ring-offset-1
+  bg-[rgb(var(--accent-500)/0.08)]` on top of the focus ring so sighted
+  keyboard users always know which card is being moved.
+
+### Motion
+
+- Card hover transitions use `motion-safe:transition-transform
+  duration-era-fast ease-era-brush` plus a `-translate-y-0.5` lift —
+  transform-only, gated on `motion-safe:` so reduced-motion users skip
+  the animation entirely (CLAUDE.md **Conventions Discovered** #1).
+- No opacity ramps anywhere. Grab indicator is colour + ring — colour
+  contrast verified by axe.
+- The live region itself is visually hidden via the standard sr-only
+  recipe — clipped 1×1 box, no whitespace, absolute-positioned out of
+  flow so it never disturbs layout in either era.
+
+### A11y contract
+
+- `<ul role="list">` on each column body — Wave 5b2 change. Cards are
+  `<li role="listitem">`. The explicit `role="list"` keeps Safari from
+  silently dropping the `list` role when `list-style: none` is applied
+  via Tailwind's `list-none`.
+- `aria-labelledby={headingId}` + `aria-label` on each `<ul>` so AT
+  announces the column name when entering the list.
+- `aria-roledescription="draggable card"` on each `<li>` so AT
+  announces "draggable card, …" instead of the generic "list item".
+- `data-grabbed="true"` on the actively-grabbed card (visual + test
+  hook).
+- Live region: `role="status" aria-live="polite" aria-atomic="true"`.
+  Every grab / move / drop / cancel writes a new message
+  (`Picked up <label> from <col>, position N of M`, etc.). Defaults to
+  English copy; override the strings by composing your own translator
+  layer (the current iteration is not i18n-aware).
+- `assertive` is available for cases where the announcement must
+  interrupt other speech (e.g. failure / collision) — use sparingly.
+  `off` suppresses the region entirely.
+- WCAG 2.1 AA contrast: passes on both eras for card text
+  (`text-era-primary`), column headers (`text-era-muted`), focus
+  rings, and grabbed-state tints. The Neon ink override (`text-era-primary`
+  on the card body) is documented in `KanbanBoard.styles.ts`.
+
+### Cross-references
+
+- **`Components/KanbanBoard`** — autodocs, all stories, interactive
+  playground including `Empty`, `EmptyColumns`, and keyboard reorder
+- **`Patterns/Empty States`** — `emptyState?: ReactNode` slot, default
+  copy, and the per-column-empty-vs-board-empty distinction
+- **`Components/EmptyState`** — base API used by the default empty wrap
+- **`Components/DragDrop`** — sibling component sharing the keyboard
+  reorder state machine
+- **`Foundations/Accessibility`** — live-region announcement
+  conventions and the keyboard-alternative-to-drag contract
+- **WAI-ARIA Authoring Practices — Drag-and-Drop with Keyboard** — the
+  upstream pattern this component implements

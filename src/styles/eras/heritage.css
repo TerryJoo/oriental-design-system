@@ -1,0 +1,169 @@
+/**
+ * Heritage era physical assets — SVG patterns, ink-wash masks,
+ * and ALL era CSS variables (single source of truth for static rendering).
+ *
+ * The TypeScript counterpart `src/themes/era/heritage.ts` mirrors the same
+ * values and is used by `applyEra()` for runtime switching that doesn't
+ * depend on this stylesheet being loaded. Keep the two in sync.
+ */
+
+:root[data-era="heritage"] {
+  /* ── SVG patterns / masks ─────────────────────────────────── */
+  --pattern-woodgrain:
+    repeating-linear-gradient(
+      90deg,
+      rgba(110, 72, 38, 0.1) 0px,
+      rgba(110, 72, 38, 0.1) 1px,
+      rgba(110, 72, 38, 0) 1px,
+      rgba(110, 72, 38, 0) 5px
+    ),
+    radial-gradient(
+      ellipse at 20% 30%,
+      rgba(120, 80, 40, 0.22),
+      transparent 60%
+    ),
+    radial-gradient(
+      ellipse at 80% 70%,
+      rgba(140, 95, 50, 0.18),
+      transparent 60%
+    );
+
+  --pattern-porcelain: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120' viewBox='0 0 120 120'><g fill='none' stroke='rgba(43,29,16,0.18)' stroke-width='1'><circle cx='60' cy='60' r='40'/><path d='M60 20 Q90 40 60 60 Q30 80 60 100'/><path d='M20 60 Q40 30 60 60 Q80 90 100 60'/></g></svg>");
+
+  /* Hanji paper grain — soft warm fiber speckle, mid-frequency. Used by
+     ScrollReveal, Frame, SealStamp underlay. Subtle enough to layer with
+     woodgrain or porcelain without reading as noise. */
+  --pattern-paper:
+    radial-gradient(circle at 30% 20%, rgba(90, 60, 30, 0.06), transparent 40%),
+    radial-gradient(
+      circle at 70% 75%,
+      rgba(120, 80, 40, 0.08),
+      transparent 50%
+    ),
+    repeating-radial-gradient(
+      circle at 50% 50%,
+      rgba(140, 110, 70, 0.04) 0 1px,
+      transparent 1px 3px
+    );
+
+  /* Card back — small floral repeat tinted on hanji.
+     Used by CardDraw obverse face. */
+  --pattern-card-back: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='40' height='40' viewBox='0 0 40 40'><g fill='none' stroke='rgba(122,45,26,0.35)' stroke-width='0.8'><circle cx='20' cy='20' r='4'/><path d='M20 12 Q24 16 20 20 Q16 24 20 28 M12 20 Q16 16 20 20 Q24 24 28 20'/></g></svg>");
+
+  /* Frame corner cartouche — Heritage 매듭/wreath motif. TODO(E5): replace
+     with the final ornate SVG when the Frame component is implemented; this
+     placeholder reads as a corner bracket suitable for borders. */
+  --pattern-frame-ornament: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='48' height='48' viewBox='0 0 48 48'><g fill='none' stroke='rgba(122,45,26,0.6)' stroke-width='1.2' stroke-linecap='round'><path d='M2 14 V4 H14 M2 8 H8 V2'/><path d='M46 14 V4 H34 M46 8 H40 V2'/><path d='M2 34 V44 H14 M2 40 H8 V46'/><path d='M46 34 V44 H34 M46 40 H40 V46'/></g></svg>");
+
+  --mask-inkwash:
+    radial-gradient(circle at 30% 20%, rgba(0, 0, 0, 0.2), transparent 60%),
+    radial-gradient(circle at 70% 80%, rgba(0, 0, 0, 0.15), transparent 55%);
+
+  /* ── Accent palette (terracotta · 적토) ───────────────────── */
+  --accent-50: 252 245 236;
+  --accent-100: 243 224 199;
+  --accent-200: 230 196 158;
+  --accent-300: 211 164 122;
+  --accent-400: 192 133 92;
+  --accent-500: 167 106 68;
+  --accent-600: 138 80 48;
+  --accent-700: 108 61 36;
+  --accent-800: 78 43 25;
+  --accent-900: 54 30 17;
+  --accent-950: 31 17 10;
+
+  /* Era-aware "strong accent" for emphasized text (active tabs, links) on
+     the era surface. Heritage paints accent-700 (terracotta) on hanji —
+     contrast 7.6:1, AAA. Neon falls back to a brighter accent-300 because
+     accent-700 on the void surface clears only 2.7:1 (axe color-contrast). */
+  --era-accent-strong: 108 61 36; /* accent-700 */
+
+  /* ── Surface (한지 · 목판) ────────────────────────────────── */
+  --era-surface-base: #f6efe1;
+  --era-surface-raised: #fbf5e8;
+  --era-surface-sunken: #e7dcc4;
+  --era-surface-overlay: rgba(44, 30, 17, 0.55);
+
+  /* ── Material bindings ────────────────────────────────────── */
+  --era-material-grain: var(--pattern-woodgrain);
+  --era-material-pattern: var(--pattern-porcelain);
+  --era-material-scanline: none;
+  --era-material-inkwash: var(--mask-inkwash);
+  --era-material-paper: var(--pattern-paper);
+
+  /* ── Ink ──────────────────────────────────────────────────── */
+  --era-ink-primary: #2b1d10;
+  --era-ink-muted: #6e5a3f;
+  --era-ink-inverse: #fbf5e8;
+
+  /* ── Edge (먹선) — color-only AND full border-shorthand ───── */
+  --era-edge-color-soft: rgba(43, 29, 16, 0.22);
+  --era-edge-color-hard: rgba(43, 29, 16, 0.6);
+  --era-edge-color-seal: #7a2d1a;
+  --era-edge-soft: 1px solid var(--era-edge-color-soft);
+  --era-edge-hard: 1.5px solid var(--era-edge-color-hard);
+  --era-edge-seal: 2px solid var(--era-edge-color-seal);
+
+  /* ── Shadow (종이 두께) ───────────────────────────────────── */
+  --era-shadow-card:
+    0 1px 0 rgba(78, 56, 30, 0.12), 0 6px 18px -10px rgba(60, 40, 20, 0.35);
+  --era-shadow-modal: 0 12px 40px -12px rgba(60, 40, 20, 0.45);
+  --era-shadow-tooltip: 0 2px 10px -2px rgba(60, 40, 20, 0.3);
+  --era-shadow-pressed: inset 0 2px 6px rgba(60, 40, 20, 0.25);
+
+  /* ── Motion (붓 — 느리고 부드럽게) ────────────────────────── */
+  --era-ease-brush: cubic-bezier(0.22, 0.61, 0.36, 1);
+  --era-ease-charge: cubic-bezier(0.4, 0, 0.2, 1);
+  --era-dur-fast: 220ms;
+  --era-dur-normal: 380ms;
+  --era-dur-slow: 640ms;
+
+  /* ── Intent ───────────────────────────────────────────────── */
+  --era-intent-success: #4f7a3c;
+  --era-intent-warning: #c88d2b;
+  --era-intent-error: #a3341f;
+
+  /* ── Boardgame slots — SealStamp · DiceRoll · ScrollReveal ── */
+  /* Seal (낙관/도장) — oxblood-700 ink on warm parchment. WCAG AA on #fbf5e8. */
+  --era-seal-ink: #7a1c14; /* oxblood-700 — matches existing --era-edge-color-seal #7a2d1a family */
+  --era-seal-paper: #fbf5e8; /* warm parchment underlay */
+  --era-seal-edge: #5c140e; /* oxblood-800 — outer stroke of stamp impression */
+
+  /* Dice — ivory bone face, oxblood pip, warm shadow edge. */
+  --era-dice-face: #f3e7c8; /* warm bone, AA contrast vs oxblood pip */
+  --era-dice-pip: #7a1c14;
+  --era-dice-edge: rgba(60, 40, 20, 0.45);
+
+  /* Scroll edge — warm parchment leading edge, transparent trailing edge,
+     warm umbra cast shadow from the unrolling roll. */
+  --era-scroll-edge-start: #f6efe1; /* opaque parchment */
+  --era-scroll-edge-end: rgba(246, 239, 225, 0); /* same hue alpha 0 */
+  --era-scroll-shadow: 0 8px 22px -10px rgba(60, 40, 20, 0.5);
+
+  /* Card-back · Frame ornament — pattern references. */
+  --era-card-back: var(--pattern-card-back);
+  --era-frame-ornament: var(--pattern-frame-ornament);
+
+  /* ── Typography (Gowun Batang · Noto Serif KR · Cormorant) ── */
+  --font-display:
+    "Gowun Batang", "Cormorant Garamond", "AppleMyungjo", "Hoefler Text", Didot,
+    "Apple SD Gothic Neo", "Malgun Gothic", serif;
+  --font-body:
+    "Noto Serif KR", "Gowun Batang", "AppleMyungjo", "Hoefler Text", Georgia,
+    "Apple SD Gothic Neo", serif;
+  --font-accent:
+    "Cormorant Garamond", "Hoefler Text", Didot, "Times New Roman", serif;
+  --display-letter-spacing: -0.01em;
+  --body-letter-spacing: 0em;
+  --body-line-height: 1.7;
+  --ui-text-transform: none;
+}
+
+/* When data-era="heritage" is set on <html>, propagate page-level typography
+   so plain HTML elements (h1, p, body) feel right without per-component opt-in. */
+:root[data-era="heritage"] body {
+  font-family: var(--font-body);
+  line-height: var(--body-line-height);
+  color: var(--era-ink-primary);
+  background-color: var(--era-surface-base);
+}

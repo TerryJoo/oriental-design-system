@@ -1,0 +1,321 @@
+import { Meta } from "@storybook/blocks";
+
+<Meta title="Anatomy/DropdownMenu" />
+
+# DropdownMenu — anatomy, do/don't, spec
+
+`DropdownMenu` is the system's `role="menu"` surface — a flat list of
+actions (or sectioned groups) that the user navigates with arrow keys
+and activates with Enter / Space. Reach for it when the surface
+contains *commands* (Edit, Duplicate, Delete) rather than form fields.
+For free-form content surfaces, use
+[`Popover`](?path=/docs/anatomy-popover--docs); for interruptive
+confirmations, [`Modal`](?path=/docs/anatomy-modal--docs).
+
+This page documents the visual decomposition, prop contract, common
+usage patterns, and the keyboard / focus / motion / a11y spec the
+component honours.
+
+---
+
+## Anatomy
+
+The DropdownMenu is a flat or sectioned list of menu items rendered as
+real `<button>` elements with `role="menuitem"`. The component is
+**unstyled-as-a-host** — it does not own its own anchor or open/close
+state; consumers pair it with their own trigger (often inside a
+`Popover` or via a custom open-state hook).
+
+```
+┌──────────────────────────────────┐
+│ ① Surface (role="menu")          │
+│  ┌─────────────────────────────┐ │
+│  │ ② Section (one or more)     │ │
+│  │   ┌───────────────────────┐ │ │
+│  │   │ ③ Item (role=menuitem)│ │ │
+│  │   │  ④ icon  ⑤ label      │ │ │
+│  │   └───────────────────────┘ │ │
+│  │   …more items…              │ │
+│  └─────────────────────────────┘ │
+│  ⑥ Separator (role="separator") │
+│  ┌─────────────────────────────┐ │
+│  │ ② Section (next)            │ │
+│  │   ③ Item …                  │ │
+│  └─────────────────────────────┘ │
+└──────────────────────────────────┘
+```
+
+| Part | Role / class                                        | Source                                                                |
+| ---- | --------------------------------------------------- | --------------------------------------------------------------------- |
+| ①    | `<div role="menu">` `dropdownMenuRoot`              | `DropdownMenu.tsx` — owns keyboard handling, focus management        |
+| ②    | Logical grouping (`DropdownMenuSection`)            | Optional — flatten to a single list if no sections                    |
+| ③    | `<button type="button" role="menuitem">`            | Real focusable button. Roving `tabIndex` (0 on focused item, -1 on rest) |
+| ④    | `<span aria-hidden="true">{icon}</span>`            | Hidden from AT — label carries semantics                              |
+| ⑤    | `<span>{label}</span>`                              | Visible accessible name                                               |
+| ⑥    | `<div role="separator">` `dropdownMenuSeparator`    | Renders only between sections (`sIdx > 0`)                            |
+
+`flatIdx` is shared across sections so refs and tabIndex stay stable
+regardless of grouping — adding/removing a section does not invalidate
+the focus model.
+
+---
+
+## Props
+
+The full autodocs prop table is at
+[`Components/DropdownMenu`](?path=/docs/components-dropdownmenu--docs).
+
+### Items
+
+| Prop    | Type                                                                       | Notes                                                |
+| ------- | -------------------------------------------------------------------------- | ---------------------------------------------------- |
+| `items` | `ReadonlyArray<DropdownMenuItem> \| ReadonlyArray<DropdownMenuSection>`    | Required. Sectioned and flat shapes are both supported and are normalised internally to a flat list. |
+
+### `DropdownMenuItem`
+
+| Field      | Type            | Notes                                            |
+| ---------- | --------------- | ------------------------------------------------ |
+| `key`      | `string`        | Required. React key, must be unique per item.    |
+| `label`    | `ReactNode`     | Required. Visible accessible name.               |
+| `icon`     | `ReactNode`     | Optional. Wrapped in `aria-hidden="true"`.       |
+| `onSelect` | `() => void`    | Fired on click, Enter, or Space.                 |
+| `danger`   | `boolean`       | Tints the item with the era error colour.        |
+| `disabled` | `boolean`       | Skipped by arrow / Home / End navigation.        |
+
+### Lifecycle
+
+| Prop            | Type             | Default | Notes                                                       |
+| --------------- | ---------------- | ------- | ----------------------------------------------------------- |
+| `onClose`       | `() => void`     | —       | Fires on Escape, Tab leaving the surface, and after item activation when `closeOnSelect` is true. |
+| `closeOnSelect` | `boolean`        | `true`  | Set to `false` for checkbox/radio menus where the user toggles multiple values without dismissing. |
+
+### Native
+
+| Prop        | Type     | Notes                                                |
+| ----------- | -------- | ---------------------------------------------------- |
+| `className` | `string` | Merged with `dropdownMenuRoot` on the surface div.   |
+| `onKeyDown` | handler  | Runs **before** the built-in handler. Call `e.preventDefault()` to suppress built-in handling for that key. |
+
+---
+
+## Do
+
+### Pair with a Popover (or your own open-state hook)
+
+```tsx
+const [open, setOpen] = useState(false);
+
+<Popover
+  open={open}
+  onOpenChange={setOpen}
+  trigger={<Button>⋯</Button>}
+  content={
+    <DropdownMenu
+      onClose={() => setOpen(false)}
+      items={[
+        { key: "edit", label: "수정", onSelect: handleEdit },
+        { key: "duplicate", label: "복제", onSelect: handleDuplicate },
+        { key: "delete", label: "삭제", danger: true, onSelect: handleDelete },
+      ]}
+    />
+  }
+/>
+```
+
+`DropdownMenu` does not own the open state. The Popover handles
+mount/unmount; `onClose` lets the menu request dismissal back up.
+
+### Use sections to group related commands
+
+```tsx
+<DropdownMenu
+  onClose={close}
+  items={[
+    { items: [
+      { key: "open", label: "열기", onSelect: open },
+      { key: "rename", label: "이름 바꾸기", onSelect: rename },
+    ]},
+    { items: [
+      { key: "delete", label: "삭제", danger: true, onSelect: del },
+    ]},
+  ]}
+/>
+```
+
+A `<div role="separator">` is rendered between sections automatically.
+Use sections to put destructive commands (`danger: true`) below a
+divider.
+
+### Set `closeOnSelect={false}` for multi-toggle surfaces
+
+```tsx
+<DropdownMenu
+  closeOnSelect={false}
+  onClose={close}
+  items={columns.map((col) => ({
+    key: col.id,
+    label: (
+      <Checkbox checked={col.visible} onChange={() => toggle(col.id)} readOnly>
+        {col.label}
+      </Checkbox>
+    ),
+    onSelect: () => toggle(col.id),
+  }))}
+/>
+```
+
+For column-visibility / filter-toggle menus, the user expects to toggle
+several values without the surface dismissing each time. Wire your own
+close trigger (e.g., a Done button or click-outside via the host
+Popover).
+
+### Tag destructive actions with `danger: true`
+
+```tsx
+{ key: "delete", label: "삭제", danger: true, onSelect: del }
+```
+
+Destructive items pick up the era error colour for both the label and
+hover background. This is purely visual — the action is otherwise
+identical to a normal `onSelect`. Pair with an `alertdialog` Modal for
+the actual confirmation flow.
+
+---
+
+## Don't
+
+### Don't put non-action content in `items`
+
+```tsx
+{ key: "info", label: <span>현재 사용자: ada@…</span> }
+```
+
+Menu items are *commands*. Status text, form fields, or static info
+should live in a [`Popover`](?path=/docs/anatomy-popover--docs) (which
+has no menu semantics) — assistive tech announces every menu item as
+an actionable element.
+
+### Don't let `closeOnSelect={false}` block the only escape route
+
+If you disable auto-close, the surface only closes via Escape, Tab, or
+your own click-outside / button. Make at least one of those obvious.
+Otherwise keyboard users get stuck cycling the menu.
+
+### Don't reuse keys across items
+
+`key` is React's reconciliation key **and** the item ref index. Two
+items sharing a key collapse to a single ref slot, breaking focus
+movement. Sectioned input has the same constraint — keys must be
+globally unique across sections, not per-section.
+
+### Don't omit `onSelect` and expect click to do nothing
+
+Without `onSelect`, click and Enter still fire the keyboard handler
+and dismiss the menu (when `closeOnSelect` is true). The result is a
+silent close — confusing UX. Either give every item an `onSelect` or
+mark the item `disabled`.
+
+### Don't preventDefault on Tab in a wrapping `onKeyDown`
+
+The Tab handler explicitly **does not** preventDefault. Tab leaves the
+menu naturally and `onClose` fires so the host can unmount. Wave 5b2
+made this change — previously Tab was a no-op which trapped users.
+If you wrap the menu and intercept `onKeyDown`, let Tab pass through.
+
+---
+
+## Spec
+
+### Keyboard
+
+| Key                | Behaviour                                                                                  |
+| ------------------ | ------------------------------------------------------------------------------------------ |
+| `ArrowDown`        | Move focus to next enabled item; wraps to first after last.                                |
+| `ArrowUp`          | Move focus to previous enabled item; wraps to last before first.                           |
+| `Home`             | Move focus to the first enabled item.                                                      |
+| `End`              | Move focus to the last enabled item.                                                       |
+| `Enter`, `Space`   | Activate the focused item: fire `onSelect`, then call `onClose` if `closeOnSelect`.        |
+| `Escape`           | Call `onClose` (consumer typically unmounts the menu and restores trigger focus).          |
+| `Tab`, `Shift+Tab` | Call `onClose`. Focus then proceeds naturally to the next/prev focusable in the document. **Wave 5b2 change** — previously a no-op. |
+| Other keys         | Pass to the consumer-provided `onKeyDown`, which runs before the built-in handler.         |
+
+Disabled items are skipped during navigation but remain visible and
+mouse-hoverable (they just don't focus on hover, see below).
+
+### Focus management
+
+- **Roving tabindex** — exactly one item carries `tabIndex={0}` (the
+  currently focused one), all others carry `tabIndex={-1}`. The whole
+  menu is a single Tab stop in the document order.
+- **On mount** — `requestAnimationFrame` schedules a `focus()` call on
+  the first enabled item. The rAF gate ensures the DOM node exists
+  before the focus attempt.
+- **On hover** — `onMouseEnter` updates `focusedIndex` for non-disabled
+  items so keyboard and mouse focus stay in sync. Disabled items do
+  not steal focus on hover.
+- **On items change** — if the focused index becomes invalid (item
+  removed, disabled, or list shrunk), the focus index clamps back to
+  `findFirstEnabled(flatItems)` via the second effect.
+- **On close** — `onClose` fires; the consumer is responsible for
+  restoring focus to its trigger (typically via `Popover`'s built-in
+  focus restoration).
+
+### Click-outside
+
+The component itself does **not** listen for outside clicks — it has
+no anchor and no portal. Click-outside dismissal is the host's job
+(usually `Popover`, which already handles it).
+
+### Body scroll lock
+
+**No.** DropdownMenu is non-modal; the host Popover does not lock
+scroll either. If you embed a menu inside a Modal's footer, the modal
+already locks scroll for you.
+
+### `role`
+
+- Surface: `role="menu"`.
+- Items: `role="menuitem"` on a real `<button type="button">`. The
+  button gives free keyboard activation, focus rings, and disabled
+  semantics; `role="menuitem"` keeps screen readers in menu-mode.
+- Separator: `role="separator"` between sections only — never inside
+  a section.
+
+The component does not currently support `menuitemradio` /
+`menuitemcheckbox`. For toggle menus, render Checkbox/Radio elements
+inside `label` and use `closeOnSelect={false}`.
+
+### Motion
+
+DropdownMenu has no entry animation of its own — the surrounding
+Popover provides the `motion-safe:animate-[popover-enter_…]` keyframe.
+Inside the menu, item hover is `transition-colors duration-era-fast
+ease-era-brush` — colour-only, no transform / opacity change, so axe
+contrast scans are unaffected mid-transition.
+
+### A11y contract
+
+- Active item text on accent backgrounds uses `text-white` (not
+  `text-era-inverse`) per Wave 5b2 convention #2 — `text-era-inverse`
+  resolves to dark `#0b0e18` in Neon era and fails AA against
+  `accent-600`. Hover and focus surfaces use `accent-500/0.1` so the
+  underlying text colour stays unchanged.
+- Icons inside items are wrapped in `aria-hidden="true"` so the label
+  carries the only accessible name.
+- Disabled items get `disabled` on the `<button>` (real semantic
+  disablement) plus `opacity-40 cursor-not-allowed` for the visual
+  state.
+- The menu surface itself has no `aria-label` — its accessible name
+  comes from the trigger via `aria-haspopup="menu"` on the host
+  (Popover sets `aria-haspopup="dialog"`; if you need stricter menu
+  semantics, set `aria-haspopup="menu"` directly on your trigger).
+
+---
+
+## Cross-references
+
+- [`Components/DropdownMenu`](?path=/docs/components-dropdownmenu--docs) — autodocs, full prop table, all stories
+- [`Anatomy/Popover`](?path=/docs/anatomy-popover--docs) — typical host surface that owns open state and outside-click
+- [`Anatomy/Modal`](?path=/docs/anatomy-modal--docs) — interruptive sibling for confirmation flows triggered from a destructive menu item
+- [`Foundations/Accessibility`](?path=/docs/foundations-accessibility--docs) — roving tabindex and live-region conventions
+- WAI-ARIA Authoring Practices — [Menu and Menubar pattern](https://www.w3.org/WAI/ARIA/apg/patterns/menubar/)

@@ -1,0 +1,289 @@
+import { Meta } from "@storybook/blocks";
+
+<Meta title="Patterns/Generics" />
+
+# TypeScript generics in the design system
+
+A handful of components in the Oriental Design System take a generic type
+parameter so that consumer code stays type-safe while the component itself
+remains row-shape-agnostic. `DataTable<T>` is the canonical case: the
+component knows nothing about your row shape, but every cell renderer,
+`rowKey` extractor, and the `data` array itself share the same `T`, so
+typos like `row.naem` are caught at compile time.
+
+This page is the contract for working with those generic props from the
+consumer side: how to type your row, when to write the generic argument
+explicitly versus letting TypeScript infer it, the two `cell` accessor
+patterns, and the constraint pitfalls that bite first-time users.
+
+---
+
+## Why a design-system component takes a generic param
+
+The alternative — `data: ReadonlyArray<Record<string, unknown>>` — would
+require every cell renderer to widen / narrow its argument by hand, and
+would silently accept rows whose keys don't match the columns. Generics
+flip that contract:
+
+- `data: ReadonlyArray<T>` — the table consumes whatever shape you hand it.
+- `columns: ReadonlyArray<DataTableColumn<T>>` — each `cell(row)` receives
+  exactly your `T`, fully typed.
+- `rowKey?: (row: T, index: number) => string | number` — the key
+  extractor sees your real fields, not `unknown`.
+
+The component itself does not branch on the shape; it forwards `row` to
+`cell()` and trusts the caller's `T`. This is what makes the table
+**framework-agnostic on row shape** and **type-safe at the call site**.
+
+---
+
+## DataTable&lt;T&gt; — full consumer example
+
+```tsx
+import { DataTable, type DataTableColumn } from "@jyi/design-system";
+import { Tag } from "@jyi/design-system";
+
+type User = {
+  id: string;
+  name: string;
+  email: string;
+  role: "admin" | "member" | "guest";
+};
+
+const users: ReadonlyArray<User> = [
+  { id: "u-1", name: "Ada Lovelace", email: "ada@example.com", role: "admin" },
+  { id: "u-2", name: "Alan Turing", email: "alan@example.com", role: "member" },
+];
+
+const columns: DataTableColumn<User>[] = [
+  { key: "name", header: "Name", cell: (row) => row.name },
+  { key: "email", header: "Email", cell: (row) => row.email },
+  {
+    key: "role",
+    header: "Role",
+    align: "center",
+    cell: (row) => <Tag size="sm">{row.role}</Tag>,
+  },
+];
+
+<DataTable<User>
+  data={users}
+  columns={columns}
+  rowKey={(row) => row.id}
+  caption="Users — admin console"
+/>;
+```
+
+Three things are doing real work here:
+
+1. `DataTableColumn<User>[]` ties every `cell(row)` to `User`, so
+   `row.role` is the literal union `"admin" | "member" | "guest"`, not
+   `string`.
+2. `rowKey={(row) => row.id}` uses the real `id` field — no stringly-typed
+   key path, no runtime coercion.
+3. The explicit `<DataTable<User>>` documents intent at the call site even
+   when inference would also work (see below).
+
+---
+
+## Inferring vs. explicit generic
+
+TypeScript can infer `T` from the `data` prop, so both of these compile
+identically:
+
+```tsx
+// Implicit — T inferred as User from `data={users}`
+<DataTable data={users} columns={columns} />
+
+// Explicit — T pinned to User regardless of `data`
+<DataTable<User> data={users} columns={columns} />
+```
+
+Use **implicit** inference when:
+
+- `data` is a typed `ReadonlyArray<User>` (or `User[]`) at the call site.
+- `columns` is also typed as `DataTableColumn<User>[]` so both arguments
+  agree on `T`.
+- You want the call site to read like plain JSX with no extra noise.
+
+Use **explicit** `<DataTable<User>>` when:
+
+- `data` comes from `useState<User[]>([])` or a hook return that the
+  reader can't see at a glance — pinning `T` at the JSX call documents
+  intent.
+- You want a type error if `data` is _ever_ passed as something else
+  (e.g. a future refactor returns `Admin[]` from the hook). With explicit
+  `<User>`, the mismatch surfaces here, not three files away.
+- The columns are inlined and TypeScript can't see the row type from the
+  `columns` literal alone.
+
+The Storybook stories in this repo use a third pattern — a one-shot cast
+to a concretely-typed component reference — because CSF3's `Meta<typeof
+Component>` cannot follow the `as <T>(...)` cast on the exported
+`DataTable`. That pattern is documented in `DataTable.stories.tsx` and is
+specific to Storybook meta typing; **production code should never need
+the cast.**
+
+---
+
+## Column accessor patterns
+
+`DataTableColumn<T>` declares `cell` as a function:
+
+```ts
+cell: (row: T, rowIndex: number) => ReactNode;
+```
+
+It deliberately does **not** ship a `keyof T` accessor shorthand. Two
+reasons: cells often need to compose multiple fields or wrap them in
+JSX, and a `keyof` accessor has no obvious render behaviour for non-text
+fields (dates, arrays, nested objects). Do the work in the renderer:
+
+### Single-field render — render the value directly
+
+```tsx
+const columns: DataTableColumn<User>[] = [
+  { key: "name", header: "Name", cell: (row) => row.name },
+  { key: "email", header: "Email", cell: (row) => row.email },
+];
+```
+
+### Composed render — combine multiple fields
+
+```tsx
+const columns: DataTableColumn<User>[] = [
+  {
+    key: "identity",
+    header: "User",
+    cell: (row) => (
+      <span className="flex flex-col">
+        <span className="font-medium">{row.name}</span>
+        <span className="text-era-muted text-sm">{row.email}</span>
+      </span>
+    ),
+  },
+];
+```
+
+### Index-aware render — use `rowIndex`
+
+```tsx
+const columns: DataTableColumn<User>[] = [
+  { key: "rank", header: "#", cell: (_row, idx) => idx + 1 },
+];
+```
+
+The second arg is the **index inside `data`**, not a stable identity.
+For stable identity (sort, filter, drag-reorder), supply a `rowKey`
+extractor; do not key off the index.
+
+---
+
+## Common pitfalls
+
+### 1. Discriminated-union rows
+
+When `T` is a union (`User | Admin`), every cell sees the union and must
+narrow before accessing union-only fields:
+
+```tsx
+type Member =
+  | { kind: "user"; id: string; name: string }
+  | { kind: "admin"; id: string; name: string; permissions: string[] };
+
+const columns: DataTableColumn<Member>[] = [
+  { key: "name", header: "Name", cell: (row) => row.name }, // OK — shared field
+  {
+    key: "perms",
+    header: "Permissions",
+    cell: (row) =>
+      row.kind === "admin" ? row.permissions.join(", ") : "—",
+  },
+];
+```
+
+Without the `row.kind === "admin"` guard, `row.permissions` is a type
+error because the `user` branch lacks the field. The discriminator
+(`kind` here) lives in your data shape, not in the table API.
+
+### 2. Optional fields and `undefined` narrowing
+
+Optional fields stay `T[K] | undefined` inside the renderer. Default at
+the cell, not at the type:
+
+```tsx
+type Article = { id: string; title: string; author?: string };
+
+const columns: DataTableColumn<Article>[] = [
+  { key: "title", header: "Title", cell: (row) => row.title },
+  // ❌ Wrong — `author` may be undefined; React renders nothing for
+  //    undefined, but downstream `.toUpperCase()` would throw.
+  // { key: "author", header: "Author", cell: (row) => row.author.toUpperCase() },
+
+  // ✅ Right — narrow at the call site.
+  {
+    key: "author",
+    header: "Author",
+    cell: (row) => row.author ?? "Anonymous",
+  },
+];
+```
+
+Resist the urge to make `author` non-optional in the type just to satisfy
+the cell — that lies to every other consumer of `Article`.
+
+### 3. Generic constraint design — when should `T extends …`?
+
+`DataTable<T>` deliberately has **no constraint** on `T`. The component
+never inspects the shape; it just forwards `row` to your `cell`. A
+`T extends Record<string, unknown>` constraint would be cosmetic:
+
+- It would not catch real bugs (your `cell` already gets the typed
+  `row`).
+- It would reject perfectly fine shapes like `T = number` or
+  `T = readonly [string, string]` for a sparse table.
+
+Adopt this rule for any future generic component in the system: **only
+add a constraint when the component itself reads a field by name**. If
+the component is a passthrough, leave `T` unconstrained.
+
+If a constraint is genuinely needed (e.g. a future component requires
+every row to expose an `id`), prefer a structural constraint over a
+nominal one:
+
+```ts
+// ✅ Right — structural; any object with a string `id` works
+function Component<T extends { id: string }>(props: { data: T[] }): JSX.Element;
+
+// ❌ Wrong — forces consumers to extend a named type they may not own
+function Component<T extends BaseRow>(props: { data: T[] }): JSX.Element;
+```
+
+---
+
+## Other generic components in the system
+
+At the time of writing, **`DataTable<T>` is the only component with a
+generic type parameter**. `Tabs`, `KanbanBoard`, `PageTree`,
+`DropdownMenu`, and `CommandPalette` all accept item arrays, but they
+each ship with a concrete item interface (`TabItem`, `KanbanCard`,
+`PageTreeNode`, `DropdownMenuItem`, `CommandPaletteItem`) rather than a
+generic, because the component itself reads named fields (e.g. `id`,
+`label`, `disabled`) at runtime.
+
+When new generic primitives are added (e.g. a future `VirtualList<T>`,
+`Combobox<T>`, or `Tree<T>`), this page will grow a section per
+component. The patterns above — implicit vs. explicit generic, accessor
+discipline, narrowing of unions and optionals, constraint minimalism —
+apply to every one of them.
+
+---
+
+## Cross-references
+
+- **`Components/DataTable`** — autodocs, full prop table, all stories
+- **`Patterns/Empty States`** — `emptyState?: ReactNode` slot on `DataTable<T>`
+- **`Foundations/Accessibility`** — caption + scope contracts honoured by the table
+- TypeScript handbook —
+  [Generics](https://www.typescriptlang.org/docs/handbook/2/generics.html)
+  for the language-level reference

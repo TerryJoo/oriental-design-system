@@ -1,0 +1,110 @@
+import { Meta } from "@storybook/blocks";
+
+<Meta title="Patterns/RTL" />
+
+# RTL (Right-to-Left) Direction
+
+The Oriental Design System renders correctly under both `dir="ltr"`
+(default) and `dir="rtl"` (Arabic, Hebrew, Persian, Urdu, etc.). Toggle
+direction at any time via the **Direction** toolbar (top-right of the
+Storybook canvas). Every existing story renders under the active
+direction; no per-story opt-in needed.
+
+---
+
+## Verification policy
+
+A component is "RTL-ready" when, under `dir="rtl"`:
+
+1. **Layout flips inline-axis.** Margins, paddings, borders, and inset
+   positioning that were inline-start/end-relative continue to read as
+   inline-start/end (not as physical left/right). We achieve this with
+   Tailwind's logical-property utilities (`ms-*`, `me-*`, `ps-*`,
+   `pe-*`, `start-*`, `end-*`, `border-s`, `border-e`, `text-start`,
+   `text-end`, `rounded-s-*`, `rounded-e-*`).
+2. **Directional glyphs visually flip.** Chevrons, arrows, and other
+   asymmetric symbols that imply forward/back motion mirror with
+   `[[dir=rtl]_&]:-scale-x-100` so they continue to point inline-end in
+   both directions. Symmetric glyphs (`/`, `·`, `…`) render identically
+   under the transform — `scale-x(-1)` on a symmetric shape is a no-op.
+3. **Keyboard navigation preserves LOGICAL meaning.** `ArrowRight`
+   advances toward the inline-end side regardless of physical layout;
+   `ArrowLeft` retreats toward inline-start. Components that bind
+   horizontal arrows look up the active direction via the `useDir`
+   hook (`src/utils/useDir.ts`) and swap key handlers accordingly.
+
+---
+
+## RTL infrastructure
+
+### `useDir()` hook
+
+```ts
+import { useDir } from "@jyi/design-system"; // (via /react entry; or copy from src/utils/useDir.ts)
+
+const dir = useDir(); // "ltr" | "rtl"
+// Listens to `<html dir>` via MutationObserver, so runtime locale
+// switches in consumer apps update components without a remount.
+```
+
+Used by components that bind `ArrowLeft` / `ArrowRight` to logical
+prev/next semantics:
+
+- **PageTree** — `ArrowLeft` collapses a node in LTR; in RTL the same
+  collapse action lives on `ArrowRight` (the visually inline-start
+  side).
+- **KanbanBoard** — cross-column card moves swap horizontal-arrow
+  meaning so "move toward next column" stays inline-end regardless of
+  direction.
+
+### Storybook Direction toolbar
+
+`.storybook/preview.ts` registers a `dir` global with `ltr` / `rtl`
+items. A dedicated `withDir` decorator writes the value directly onto
+`<html>` so the cascade picks up every Tailwind logical-property
+utility instantly — no per-story decorator needed.
+
+---
+
+## Component-by-component status
+
+| Component                | Pattern                                                                      | Notes                                                                  |
+| ------------------------ | ---------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| **Pagination**           | `[[dir=rtl]_&]:-scale-x-100` on `‹` / `›` chevrons                          | Buttons are individually focusable via Tab; no horizontal arrow nav. |
+| **Breadcrumb**           | `[[dir=rtl]_&]:-scale-x-100` on the separator                                | Symmetric default separator (`/`) unaffected.                          |
+| **Stepper**              | `flex` container flips naturally; line direction follows.                    | No direction-specific classes; circle layout is symmetric.             |
+| **Sidebar / SidebarShell** | Logical `ms-3` for header spacing; drawer slides from inline-start.        | No physical `left`/`right` positioning in the layout primitives.       |
+| **DropdownMenu**         | `text-start` on items; submenu opens toward inline-end.                      | No physical placement classes leak through.                            |
+| **PageTree**             | `useDir` for `ArrowLeft` / `ArrowRight` semantics; chevron uses `[[dir=rtl]_&]:rotate-180`. | Closed caret points inline-end in both directions. |
+| **DragDrop**             | Vertical-only `ArrowUp` / `ArrowDown` keyboard nav.                          | Horizontal axis not used; no direction conflict.                       |
+| **KanbanBoard**          | `useDir` for cross-column horizontal nav.                                    | Card moves preserve logical "next column" intent.                      |
+
+Additionally, all data-display and feedback primitives migrated to
+logical properties during the C2 sweep:
+
+- `Alert`, `Toast` — intent bars use `border-s-4` (was `border-l-4`)
+- `Separator` (vertical) — `border-s` (was `border-l`)
+- `Accordion`, `DataTable`, `ChatBubble` — `text-start` / `text-end`
+- `MarkdownEditor` (split preview) — `md:border-s`
+- `Select` — chevron at `end-3`, textarea reserves `pe-9` of padding
+
+---
+
+## Adding a new RTL-safe component
+
+When authoring a new component or accepting a contribution:
+
+1. **Prefer logical Tailwind utilities** over physical ones whenever
+   the property is direction-sensitive. Keep physical utilities only
+   for visual-glyph constructions (e.g. the rotated `border-r-2` +
+   `border-b-2` pair that draws the checkmark in `Checkbox`).
+2. **Mirror directional glyphs** with `[[dir=rtl]_&]:-scale-x-100`
+   wherever a chevron, arrow, or asymmetric icon implies horizontal
+   forward motion.
+3. **Reach for `useDir`** when binding `ArrowLeft` / `ArrowRight` to
+   logical semantics; never assume `ArrowRight === advance`.
+4. **Place a smoke story** under your component's stories file that
+   sets the global direction to RTL for a single sample — this is
+   enough to catch regressions during the axe gate. (You do not need a
+   dedicated `RTL` story per component; the global toolbar covers
+   day-to-day verification.)

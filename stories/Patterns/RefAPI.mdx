@@ -1,0 +1,349 @@
+import { Meta } from "@storybook/blocks";
+
+<Meta title="Patterns/Ref API" />
+
+# Ref API — transparent vs imperative
+
+Every component in `@jyi/design-system` accepts a `ref`. What that
+ref _resolves to_ is part of the component's contract. This page is the
+audit trail of that contract: which components forward a transparent
+DOM element, which expose an imperative method-bag, and the rules every
+contributor must follow when writing a new component.
+
+The TL;DR — **the system is currently 100% transparent-ref**. No
+component exposes a method-bag (`{ open(), close(), focus() }`). Two
+components (`Modal`, `DropdownMenu`) use `useImperativeHandle`, but only
+to forward an _internally-held_ DOM ref to the consumer; the consumer
+still receives a plain DOM element, not a custom interface.
+
+If you are adding a new component and find yourself reaching for
+`useImperativeHandle` to expose `.open()` / `.close()`, **stop and read
+the "When to use which" section first**. The system's existing
+open-state contract is declarative — adding an imperative method-bag is
+almost always the wrong move.
+
+---
+
+## Two ref styles
+
+| Style                   | What `ref.current` resolves to                  | Used by                                            |
+| ----------------------- | ----------------------------------------------- | -------------------------------------------------- |
+| **Transparent**         | A DOM element (`HTMLDivElement`, `HTMLInputElement`, etc.) | All components in this system                      |
+| **Imperative method-bag** | A plain object exposing custom methods        | _None_ — explicitly avoided as a system convention |
+
+A "transparent ref" component is one where `forwardRef<HTMLDivElement, ...>`
+forwards directly to the underlying DOM element. The consumer can treat
+the ref like any DOM element ref: measure it, scroll it into view, focus
+it, observe it with `IntersectionObserver`, etc.
+
+An "imperative method-bag" component would expose something like
+`{ open(): void; close(): void; focus(): void }` — popularized by
+Material UI, Radix Primitives, and headless UI libraries. We do not use
+this pattern, by deliberate choice (see "When to use which").
+
+---
+
+## Transparent ref — the universal contract
+
+Every component in the system forwards a single DOM element ref. The
+element type is the second generic parameter of `forwardRef<E, P>`, and
+appears in the component's TypeScript signature. Examples:
+
+```tsx
+import { useRef, useEffect } from "react";
+import { Button, Input, Modal } from "@jyi/design-system";
+
+// Button → HTMLButtonElement
+const btnRef = useRef<HTMLButtonElement>(null);
+<Button ref={btnRef}>Submit</Button>;
+// Later: btnRef.current?.focus(); btnRef.current?.click();
+
+// Input → HTMLInputElement
+const inputRef = useRef<HTMLInputElement>(null);
+<Input ref={inputRef} />;
+// Later: inputRef.current?.select(); inputRef.current?.value
+
+// Modal → HTMLDivElement (the panel, not the backdrop)
+const panelRef = useRef<HTMLDivElement>(null);
+<Modal open ref={panelRef}>…</Modal>;
+// Later: panelRef.current?.querySelector("input")?.focus();
+```
+
+### The full inventory
+
+Every component in `src/components/` falls into one of these element-type
+buckets. The forward target appears in the source as
+`forwardRef<TargetElement, Props>`.
+
+| Forward target           | Components                                                                                                                                                                                                                                                                                                          |
+| ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `HTMLButtonElement`      | `Button`                                                                                                                                                                                                                                                                                                            |
+| `HTMLInputElement`       | `Checkbox`, `Input`, `Radio`, `Switch`, `TextField`                                                                                                                                                                                                                                                                 |
+| `HTMLSelectElement`      | `Select`                                                                                                                                                                                                                                                                                                            |
+| `HTMLDivElement`         | `Accordion`, `Alert`, `AudioRecorder`, `AvatarGroup`, `Calendar`, `Card`, `ChatBubble`, `ChatThread`, `CommandPalette`, `CoverImage`, `DragDrop`, `DropdownMenu`, `EmptyState`, `EraSwitch`, `Filter`, `IconPicker`, `KanbanBoard`, `MarkdownEditor`, `Modal`, `PageTree`, `PatternBackground`, `Progress`, `PromptInput`, `Stack`, `Toast` |
+| `HTMLTableElement`       | `DataTable` (also generic over its row type — see "Generic forwardRef" below)                                                                                                                                                                                                                                       |
+| `HTMLElement` (semantic) | `Breadcrumb` (`<nav>`), `Pagination` (`<nav>`), `Sidebar` (`<aside>` or `<nav>`), `SidebarShell` (`<aside>`), `Typography` (polymorphic — narrowed by the chosen `as` element)                                                                                                                                       |
+| `HTMLOListElement`       | `Stepper`                                                                                                                                                                                                                                                                                                           |
+| `HTMLSpanElement`        | `Avatar`, `Badge`, `LoadingDots`, `Popover`, `Skeleton`, `Spinner`, `SyncStatus`, `Tag`, `Tooltip`                                                                                                                                                                                                                  |
+
+### Generic `forwardRef` (DataTable)
+
+Most components have a fixed prop shape. `DataTable<T>` is generic over
+the row type, which is awkward to combine with `forwardRef` because
+React's stock typing erases the generic. The component works around
+this with a cast:
+
+```tsx
+// src/components/DataTable/DataTable.tsx
+export const DataTable = forwardRef(DataTableInner) as <T>(
+  props: DataTableProps<T> & { ref?: Ref<HTMLTableElement> },
+) => ReturnType<typeof DataTableInner>;
+
+(DataTable as unknown as { displayName?: string }).displayName = "DataTable";
+```
+
+The consumer-visible contract is the same as every other transparent
+ref: `ref` resolves to `HTMLTableElement`. The cast is purely a type
+plumbing trick to keep `T` flowing through.
+
+### Measurement example
+
+The most common reason consumers reach for the ref is to measure the
+rendered element after layout. The ref is the same shape as any DOM
+ref, so all standard DOM techniques work:
+
+```tsx
+import { useRef, useEffect, useState } from "react";
+import { Card } from "@jyi/design-system";
+
+function MeasuredCard() {
+  const cardRef = useRef<HTMLDivElement>(null);
+  const [width, setWidth] = useState(0);
+
+  useEffect(() => {
+    if (!cardRef.current) return;
+    const ro = new ResizeObserver(([entry]) => {
+      setWidth(entry.contentRect.width);
+    });
+    ro.observe(cardRef.current);
+    return () => ro.disconnect();
+  }, []);
+
+  return <Card ref={cardRef}>Width: {width}px</Card>;
+}
+```
+
+---
+
+## Components using `useImperativeHandle`
+
+Two components in the codebase call `useImperativeHandle`. Both use it
+**transparently** — they fork the ref so they can hold an internal DOM
+handle for focus/keyboard logic while still letting the consumer
+receive the same DOM element. Neither exposes custom methods.
+
+| Component      | Source                                              | Internal ref purpose                    | Consumer sees   |
+| -------------- | --------------------------------------------------- | --------------------------------------- | --------------- |
+| `Modal`        | `src/components/Modal/Modal.tsx:118`                | Focus trap, initial-focus restoration   | `HTMLDivElement` (panel) |
+| `DropdownMenu` | `src/components/DropdownMenu/DropdownMenu.tsx:157`  | Keyboard navigation, type-ahead         | `HTMLDivElement` (surface) |
+
+Both follow the same idiom — preserve internal access while keeping the
+public ref shape transparent:
+
+```tsx
+const panelRef = useRef<HTMLDivElement | null>(null);
+useImperativeHandle(ref, () => panelRef.current as HTMLDivElement, []);
+```
+
+Note the empty dependency array. This is correct here because
+`panelRef.current` is read fresh every time the consumer accesses
+`ref.current`; React invokes the handle factory on each render but the
+returned identity changes only when `panelRef.current` does. If the
+factory had captured _state_ values, the dependency array would need to
+list them — see "Pitfalls" below.
+
+---
+
+## Imperative-API method bags — not used in this system
+
+A method-bag ref would look like:
+
+```tsx
+// ⚠️ This pattern does NOT appear anywhere in @jyi/design-system.
+const ref = useRef<{ open(): void; close(): void }>(null);
+<SomeOverlay ref={ref} />;
+ref.current?.open(); // imperative
+```
+
+No component exposes this shape. The closest candidates — Modal,
+Popover, CommandPalette, Tooltip — all use **declarative** open-state
+props instead:
+
+| Component        | Open-state contract                                                                                              |
+| ---------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `Modal`          | Controlled-only: `open: boolean`, `onClose?: () => void`                                                         |
+| `Popover`        | Controlled OR uncontrolled: `open?: boolean`, `defaultOpen?: boolean`, `onOpenChange?: (open: boolean) => void` |
+| `Tooltip`        | Controlled (optional): `open?: boolean` — falls back to hover/focus when omitted                                |
+| `CommandPalette` | No `open` prop. Consumers control mounting; `onClose?` is fired on Escape                                        |
+| `Accordion`      | Per-item: `defaultOpen?: boolean` on each item; the component owns expansion state internally                   |
+
+This is the system's open-state pattern: **you declare the desired
+state in your render, and the component reflects it**. Programmatic
+control is via `setState`, not method calls. There is one mild
+inconsistency — Popover supports both controlled and uncontrolled,
+Modal is controlled-only, CommandPalette has no `open` prop at all —
+flagged as a follow-up below.
+
+---
+
+## When to use which
+
+For new components, pick the ref style **before** writing the
+component. Reverse this checklist if you find yourself writing a custom
+ref shape:
+
+| Question                                                                                            | If "yes" → use                          |
+| --------------------------------------------------------------------------------------------------- | --------------------------------------- |
+| Does the consumer need to `.focus()`, measure, scroll, or observe the rendered element?             | Transparent ref to the relevant element |
+| Does the consumer need to read or write some internal state of the component?                       | Declarative props (controlled mode), not imperative methods |
+| Does the consumer need to trigger a side effect that doesn't correspond to any DOM-element method?  | Re-think the API. If still warranted, document the method-bag in the type and **maintain a controlled prop in parallel** |
+
+**You will almost never reach the third row.** Things that look
+imperative from the outside (open the modal, focus the search input,
+scroll to bottom of chat) are almost always achievable with:
+
+- A controlled prop (`open`, `value`, `scrollTop` via the DOM ref)
+- An effect in the parent that uses the transparent DOM ref
+- `initialFocusRef` style props (Modal, Popover already provide this)
+
+---
+
+## Pitfalls
+
+### `useImperativeHandle` re-runs on every render unless the dep array is supplied
+
+The third argument of `useImperativeHandle` is a dependency array. Omit
+it and React rebuilds the imperative handle on **every render**, which
+defeats `ref.current` identity stability and can cause downstream
+effects to over-fire.
+
+```tsx
+// ❌ Wrong — handle rebuilt every render, ref.current identity churns
+useImperativeHandle(ref, () => panelRef.current as HTMLDivElement);
+
+// ✅ Right — handle rebuilt only when DOM node changes
+useImperativeHandle(ref, () => panelRef.current as HTMLDivElement, []);
+```
+
+Modal and DropdownMenu both pass `[]` correctly. Code review for new
+components should reject any `useImperativeHandle` call that omits the
+deps array.
+
+### Imperative APIs must never replace declarative props
+
+Even if a future component genuinely warrants a method-bag ref (e.g. a
+video player exposing `.play()`/`.pause()` that wraps native `HTMLVideoElement`
+methods), the corresponding declarative prop (`playing: boolean`) should
+exist in parallel. A consumer that mounts the component already
+controlled cannot be forced to drop into an imperative paradigm to
+toggle its state.
+
+```tsx
+// ✅ Future-correct API — declarative prop coexists with imperative method
+interface VideoPlayerProps {
+  playing?: boolean; // Controlled
+  onPlayingChange?: (playing: boolean) => void;
+}
+interface VideoPlayerHandle {
+  play(): void;
+  pause(): void;
+  seek(seconds: number): void;
+}
+```
+
+### SSR: imperative methods must guard against pre-mount calls
+
+If a future imperative API _is_ added, every method must tolerate being
+called before the first render commits. The internal DOM ref will be
+`null` during SSR and on the first synchronous render after hydration.
+
+```tsx
+// ✅ Right — guard against null
+useImperativeHandle(ref, () => ({
+  focus() {
+    panelRef.current?.focus();
+  },
+  scrollIntoView() {
+    panelRef.current?.scrollIntoView({ behavior: "smooth" });
+  },
+}), []);
+
+// ❌ Wrong — throws if called before mount
+useImperativeHandle(ref, () => ({
+  focus() {
+    panelRef.current!.focus();
+  },
+}), []);
+```
+
+The transparent-ref pattern dodges this entirely: the consumer's `ref`
+starts as `null` and they already know to optional-chain
+(`btnRef.current?.focus()`). Imperative APIs that throw on
+pre-mount calls violate consumer expectations.
+
+### `forwardRef` + `displayName` is mandatory
+
+A separate but related rule from the project conventions: every
+component must call `forwardRef` and set `.displayName`. The latter is
+what React DevTools shows. Lint-clean components in this repo all
+follow this template:
+
+```tsx
+export const MyComponent = forwardRef<HTMLDivElement, MyComponentProps>(
+  (props, ref) => { /* … */ },
+);
+MyComponent.displayName = "MyComponent";
+```
+
+If you are auditing a third-party patch, make sure the displayName line
+survives.
+
+---
+
+## Inconsistencies and follow-ups
+
+The audit surfaced two soft inconsistencies that don't block today's
+contract but would be worth normalizing in a future wave:
+
+1. **Open-state shape varies across overlay components.** Popover supports
+   `open` / `defaultOpen` / `onOpenChange`; Modal supports only
+   `open` / `onClose`; CommandPalette has no open-state prop at all
+   (always-mounted, with `onClose` only firing on Escape). A consumer
+   wiring all three in the same app has to remember three different
+   contracts. A future task could unify on Popover's superset
+   (`open?` + `defaultOpen?` + `onOpenChange?`) — but this is a breaking
+   API change and warrants its own RFC.
+2. **CommandPalette lacks an imperative-feeling escape hatch.** Some
+   command-palette consumers want global keybindings (e.g. ⌘K opens it,
+   Esc closes it from anywhere). Today this is achievable by
+   controlling the mount state in the parent and forwarding focus via
+   the transparent ref + a child `<input ref>`. If we ever decide
+   CommandPalette warrants a `defaultFocusedItemKey` or
+   `onOpen` callback, that should be evaluated against the
+   "declarative-first" principle — a method-bag is not the right answer.
+
+Neither inconsistency justifies code changes today. Both are tracked
+in the project task backlog.
+
+---
+
+## Cross-reference
+
+- **`Foundations/Accessibility`** — focus management invariants for
+  Modal, Popover, DropdownMenu, and CommandPalette
+- **`Patterns/Empty States`** — declarative slot pattern for data
+  components, mirrors the no-method-bag philosophy
+- `src/components/Modal/Modal.tsx` — canonical
+  `useImperativeHandle` usage (panel ref forwarding)
+- `src/components/DropdownMenu/DropdownMenu.tsx` — same pattern,
+  different element (surface ref)

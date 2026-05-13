@@ -1,0 +1,224 @@
+import { Meta } from "@storybook/blocks";
+
+<Meta title="Patterns/Core Entry" />
+
+# Framework-agnostic usage — the `/core` entry
+
+Most consumers of the Oriental Design System reach for the React components
+at the package root. But the design system also publishes a smaller, React-free
+entry point at `@jyi/design-system/core` that exposes every primitive
+needed to render the visual layer — design tokens, the era theme switcher,
+the `cn()` class composer, and the per-component **style functions** that
+generate Tailwind class strings.
+
+Use `/core` when:
+
+- You're building with **Vanilla JS**, **Vue 3**, **Svelte**, **Astro**,
+  or any non-React framework.
+- You want to render a marketing page or email template that should match
+  the design system but doesn't need React in the bundle.
+- You're authoring a sister UI layer (e.g. a server-rendered admin page)
+  and want to share class output with the React components.
+
+---
+
+## What `/core` provides
+
+| Surface             | Examples                                                                       | Notes                                                                            |
+| ------------------- | ------------------------------------------------------------------------------ | -------------------------------------------------------------------------------- |
+| Class composer      | `cn(...)`                                                                      | Wraps `clsx` + `tailwind-merge`; resolves Tailwind conflict order.               |
+| Design tokens       | `colors`, `typography`, `borderRadius`, `animations`, `shadows`, `gradients`, `zIndex`, `era`, `textStylePresets` | Plain JS objects. Use to feed templating, palette pickers, or theme docs.        |
+| Era system          | `applyEra(element, name)`, `heritageEra`, `neonEra`, `EraName`, `EraTheme`     | Runtime switch by writing CSS variables + `data-era` onto an element.            |
+| Style functions     | `buttonStyles`, `tagStyles`, `cardStyles`, `inputStyles`, `alertStyles`, … (45+) | Each component's `*.styles.ts` module is re-exported. Returns a class string.    |
+| Style maps & types  | `buttonVariants`, `buttonSizes`, `ButtonStyleProps`, …                         | Useful when you want to enumerate variants in a doc/picker UI.                   |
+
+The full list lives in `src/core.ts`. Every export is tree-shakable —
+import only what you need.
+
+## What `/core` does **not** provide
+
+- **No React components** (`Button`, `Modal`, `Tabs`, …). Those live at the
+  root entry (`@jyi/design-system`) or `@jyi/design-system/react`.
+- **No JSX runtime**. The `/core` build is plain ESM with zero React imports
+  in the emitted JS — see [Tree-shaking](#tree-shaking) below.
+- **No CSS bundling**. You still need to wire either the Tailwind preset
+  or the prebuilt CSS — see [Wiring up styles](#wiring-up-styles).
+
+---
+
+## Vanilla JS
+
+The minimum viable setup: switch the era, then compose classes onto a
+plain DOM element.
+
+```js
+import { applyEra, buttonStyles } from "@jyi/design-system/core";
+
+// 1. Activate Heritage era on the document root.
+applyEra(document.documentElement, "heritage");
+
+// 2. Build a button whose className matches the React component output.
+const btn = document.createElement("button");
+btn.type = "button";
+btn.textContent = "확인";
+btn.className = buttonStyles({ variant: "primary", size: "md" });
+document.body.append(btn);
+
+// 3. Toggle to Neon at any time — no re-render needed; CSS variables update.
+document.querySelector("#era-toggle").addEventListener("click", () => {
+  const next =
+    document.documentElement.dataset.era === "heritage" ? "neon" : "heritage";
+  applyEra(document.documentElement, next);
+});
+```
+
+`applyEra` writes both `data-era` and the era's CSS custom-property bundle
+(`--era-surface-base`, `--era-shadow-card`, `--font-display`, …) directly
+on the element. Every selector in the components' Tailwind classes reads
+from those variables, so the visual switch is purely CSS.
+
+---
+
+## Vue 3 (Composition API)
+
+```vue
+<script setup lang="ts">
+import { onMounted, ref, computed } from "vue";
+import {
+  applyEra,
+  buttonStyles,
+  type ButtonVariant,
+  type ButtonSize,
+} from "@jyi/design-system/core";
+
+const variant = ref<ButtonVariant>("primary");
+const size = ref<ButtonSize>("md");
+
+const buttonClass = computed(() =>
+  buttonStyles({ variant: variant.value, size: size.value }),
+);
+
+onMounted(() => {
+  applyEra(document.documentElement, "heritage");
+});
+</script>
+
+<template>
+  <button type="button" :class="buttonClass">확인</button>
+</template>
+```
+
+Because `buttonStyles` is a pure function, the `computed` recalculates only
+when its inputs change — Vue's reactivity stays cheap.
+
+---
+
+## Svelte
+
+```svelte
+<script lang="ts">
+  import { onMount } from "svelte";
+  import {
+    applyEra,
+    buttonStyles,
+    type ButtonVariant,
+  } from "@jyi/design-system/core";
+
+  let variant: ButtonVariant = "primary";
+  $: buttonClass = buttonStyles({ variant, size: "md" });
+
+  onMount(() => {
+    applyEra(document.documentElement, "heritage");
+  });
+</script>
+
+<button type="button" class={buttonClass}>확인</button>
+```
+
+The `$:` reactive statement recomputes `buttonClass` whenever `variant`
+changes. Same pattern works for `tagStyles`, `cardStyles`, `inputStyles`,
+and the rest of the catalogue.
+
+---
+
+## Wiring up styles
+
+Style functions return Tailwind class strings — they're inert without the
+matching utility CSS. Pick one of the two paths below.
+
+### Path A — Tailwind preset (recommended)
+
+Even when you only consume `/core`, your project's `tailwind.config.{js,ts}`
+must register the preset so the design tokens (era variables, font stacks,
+custom utilities like `bg-era-base`, `shadow-era-card`) are available:
+
+```js
+// tailwind.config.js
+import preset from "@jyi/design-system/tailwind-preset";
+
+export default {
+  presets: [preset],
+  content: [
+    "./src/**/*.{html,js,ts,vue,svelte}",
+    // include the design system's own files so its classes survive purge
+    "./node_modules/@jyi/design-system/dist/**/*.js",
+  ],
+};
+```
+
+Without the `node_modules` glob in `content`, Tailwind's purger drops every
+class the design system uses — your buttons render unstyled.
+
+### Path B — Prebuilt CSS (no Tailwind required)
+
+If your project doesn't run Tailwind at all, ship the precompiled bundle:
+
+```js
+import "@jyi/design-system/styles";
+import "@jyi/design-system/styles/eras/heritage";
+import "@jyi/design-system/styles/eras/neon";
+import { applyEra, buttonStyles } from "@jyi/design-system/core";
+```
+
+The `/styles` import is the project's compiled CSS (Tailwind + tokens +
+component classes), and the two `/styles/eras/*` imports add the SVG
+patterns each era paints onto surface backgrounds. `applyEra` continues
+to work because the era CSS variables are defined in the era files.
+
+---
+
+## Tree-shaking
+
+The `/core` build is configured in `tsup.config.ts` as a separate entry
+that **does not list `react` as an external** because nothing in the entry
+graph imports from React at runtime. A `grep` on `dist/core.js` confirms
+zero React references in the emitted JS.
+
+**Caveat:** two style modules
+(`src/components/Separator/Separator.styles.ts` and
+`src/components/PatternBackground/PatternBackground.styles.ts`) use
+`import type { CSSProperties } from "react"` for typing inline-style
+helpers. These are **type-only imports** and are erased by the TypeScript
+compiler before bundling — they leave no trace in `dist/core.js` and don't
+require React to be installed at runtime. They do, however, mean that
+TypeScript consumers of `/core` will need `@types/react` resolvable in
+their `node_modules` for type-checking those specific exports
+(`separatorFadeStyle`, `patternBackgroundLayerStyle`). If that's
+unacceptable, import only the style functions you need and the unused
+type imports won't be reached.
+
+For runtime bundlers (Vite, Rollup, esbuild, Webpack 5+), `import { tagStyles }`
+pulls in `tagStyles` plus the `cn` helper plus its `clsx` and
+`tailwind-merge` dependencies — and nothing else. A typical single-import
+slice of `/core` lands well under 5 KB gzipped.
+
+---
+
+## Cross-references
+
+- [Foundations / Tokens](?path=/docs/foundations-tokens--docs) — the token
+  objects re-exported by `/core`.
+- [Foundations / Era](?path=/docs/foundations-era--docs) — the dual-era
+  architecture and CSS variable contract that `applyEra` wires up.
+- `src/core.ts` — the canonical export list. If a style function isn't
+  visible there, it isn't part of the framework-agnostic surface.

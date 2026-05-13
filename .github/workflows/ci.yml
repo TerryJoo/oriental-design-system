@@ -1,0 +1,146 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_call:
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4.3.1
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020  # v4.4.0
+        with:
+          node-version: "20"
+          cache: "npm"
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run format:check
+
+  typecheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4.3.1
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020  # v4.4.0
+        with:
+          node-version: "20"
+          cache: "npm"
+      - run: npm ci
+      - run: npm run typecheck
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4.3.1
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020  # v4.4.0
+        with:
+          node-version: "20"
+          cache: "npm"
+      - run: npm ci
+      - run: npm run test:coverage
+
+  build:
+    runs-on: ubuntu-latest
+    needs: [lint, typecheck, test]
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4.3.1
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020  # v4.4.0
+        with:
+          node-version: "20"
+          cache: "npm"
+      - run: npm ci
+      - run: npm run build
+
+  storybook:
+    runs-on: ubuntu-latest
+    needs: [lint, typecheck, test]
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4.3.1
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020  # v4.4.0
+        with:
+          node-version: "20"
+          cache: "npm"
+      - run: npm ci
+      - run: npm run build:storybook
+
+  a11y-gate:
+    runs-on: ubuntu-latest
+    needs: [lint, typecheck]
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4.3.1
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020  # v4.4.0
+        with:
+          node-version: "20"
+          cache: "npm"
+      - run: npm ci
+      - name: Cache Playwright browsers
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830  # v4.3.0
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('package-lock.json') }}
+      - name: Install Playwright chromium
+        run: npx playwright install chromium --with-deps
+      - name: Build Storybook
+        run: npm run build:storybook
+      - name: Run a11y test-runner
+        run: |
+          npx http-server storybook-static --port 6006 -a 127.0.0.1 --silent &
+          npx wait-on tcp:127.0.0.1:6006
+          node scripts/run-a11y-suite.mjs
+      - name: Upload a11y baseline artifact
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4.6.2
+        with:
+          name: a11y-baseline
+          path: |
+            claudedocs/wave6a-a11y-baseline.md
+            claudedocs/wave6a-a11y-violations.jsonl
+          if-no-files-found: ignore
+
+  # Visual regression (Wave 5b2 / D3) — non-blocking gate.
+  #
+  # Status: advisory. We allow this job to fail without breaking the PR
+  # check until the committed baselines have stabilized across runners
+  # (font rendering / sub-pixel jitter between macOS-local and ubuntu-CI
+  # is a known source of false positives that the threshold must absorb
+  # over several runs). Promote to a required check by removing
+  # `continue-on-error: true` once the baseline has been re-captured on
+  # ubuntu-latest and proven stable.
+  visual-regression:
+    runs-on: ubuntu-latest
+    needs: [lint, typecheck]
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4.3.1
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020  # v4.4.0
+        with:
+          node-version: "20"
+          cache: "npm"
+      - run: npm ci
+      - name: Cache Playwright browsers
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830  # v4.3.0
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('package-lock.json') }}
+      - name: Install Playwright chromium
+        run: npx playwright install chromium --with-deps
+      - name: Build Storybook
+        run: npm run build:storybook
+      - name: Run visual test-runner (compare against committed baselines)
+        env:
+          VISUAL_SNAPSHOT: "1"
+          VISUAL_SNAPSHOT_ONLY: "1"
+        run: |
+          npx http-server storybook-static --port 6006 -a 127.0.0.1 --silent &
+          npx wait-on tcp:127.0.0.1:6006
+          node scripts/run-visual-suite.mjs
+      - name: Upload visual diff artifacts
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4.6.2
+        with:
+          name: visual-diffs
+          path: |
+            __visual_snapshots__/*.actual.png
+          if-no-files-found: ignore

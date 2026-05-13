@@ -1,0 +1,440 @@
+import { Meta } from "@storybook/blocks";
+
+<Meta title="Foundations/Accessibility" />
+
+# Accessibility — WAI-ARIA, keyboard, and invariants
+
+Accessibility is a first-class constraint in the Oriental Design System.
+The system targets **WCAG 2.1 AA** and is verified continuously by axe via
+`@storybook/test-runner`: 382 stories run on every CI build with the
+`serious | critical` impact gate enabled. A single new violation fails the
+build.
+
+This page is the contract: which ARIA patterns each component implements,
+what keyboard mappings are guaranteed, and which invariants every author
+must respect when extending the system.
+
+---
+
+## Accessibility commitment
+
+| Standard            | Target                              | Verification                                                                                                            |
+| ------------------- | ----------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| WCAG 2.1            | AA                                  | axe-playwright in `npm run test-storybook:ci`                                                                           |
+| Color contrast      | 4.5:1 (text), 3:1 (large text & UI) | `--era-accent-strong` ensures both eras meet AA on the era surface; `text-white` on `bg-accent-600` passes in both eras |
+| Keyboard navigation | All interactive components          | Documented per component below; play functions in stories assert keypath                                                |
+| Screen reader       | NVDA / VoiceOver / JAWS             | `role`, `aria-label`, `aria-expanded`, `aria-selected`, `aria-live` per pattern                                         |
+| Reduced motion      | Respected                           | `motion-safe:` prefix on every entry animation                                                                          |
+
+The axe configuration lives in `.storybook/preview.ts`:
+
+```ts
+parameters: {
+  a11y: {
+    element: "#storybook-root",
+    config: {
+      rules: [
+        { id: "color-contrast", enabled: true },
+        { id: "focus-order-semantics", enabled: true },
+        { id: "aria-allowed-attr", enabled: true },
+        { id: "button-name", enabled: true },
+        { id: "label", enabled: true },
+      ],
+    },
+    options: {
+      runOnly: { type: "tag", values: ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"] },
+    },
+  },
+}
+```
+
+---
+
+## WAI-ARIA patterns implemented
+
+Each row links the component to the
+[WAI-ARIA Authoring Practices](https://www.w3.org/WAI/ARIA/apg/) pattern
+it implements.
+
+| Component                 | Pattern                                                                      | Key roles / states                                                         |
+| ------------------------- | ---------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| `Modal`                   | [Dialog (modal)](https://www.w3.org/WAI/ARIA/apg/patterns/dialog-modal/)     | `role="dialog"`, `aria-modal="true"`, `aria-labelledby`, focus trap        |
+| `Popover`                 | [Dialog (non-modal)](https://www.w3.org/WAI/ARIA/apg/patterns/dialog-modal/) | `role="dialog"`, `aria-labelledby`, no focus trap                          |
+| `Tooltip`                 | [Tooltip](https://www.w3.org/WAI/ARIA/apg/patterns/tooltip/)                 | `role="tooltip"`, anchor `aria-describedby`                                |
+| `Tabs`                    | [Tabs (manual activation)](https://www.w3.org/WAI/ARIA/apg/patterns/tabs/)   | `role="tablist"` / `tab` / `tabpanel`, `aria-selected`, `aria-controls`    |
+| `DropdownMenu`            | [Menu](https://www.w3.org/WAI/ARIA/apg/patterns/menubar/)                    | `role="menu"` / `menuitem`, `aria-haspopup`, `aria-expanded`               |
+| `Accordion`               | [Disclosure](https://www.w3.org/WAI/ARIA/apg/patterns/disclosure/)           | `<button aria-expanded>` + region; `aria-controls`                         |
+| `PageTree`                | [Tree](https://www.w3.org/WAI/ARIA/apg/patterns/treeview/)                   | `role="tree"` / `treeitem`, `aria-expanded`, `aria-level`, `aria-selected` |
+| `Calendar`                | [Grid](https://www.w3.org/WAI/ARIA/apg/patterns/grid/)                       | `role="grid"` / `gridcell`, `aria-selected`, `aria-current="date"`         |
+| `CommandPalette`          | [Combobox + Listbox](https://www.w3.org/WAI/ARIA/apg/patterns/combobox/)     | `role="combobox"` / `listbox` / `option`, `aria-activedescendant`          |
+| `DragDrop`, `KanbanBoard` | Custom (keyboard-accessible drag)                                            | `role="status" aria-live="polite"` for movement announcements              |
+
+The Sidebar nav, Breadcrumb, Pagination, Toast, Alert, and form primitives
+(Input, Select, Checkbox, Radio, Switch) follow standard semantics
+(`<nav>`, `<ol>`, `role="alert"`, `<input>` with `<label>`) — no exotic
+ARIA needed.
+
+---
+
+## Keyboard shortcuts
+
+The system distinguishes between **standard browser keys** (Tab moves
+focus, Enter activates) and **pattern-specific keys** documented below.
+
+### Modal (`role="dialog" aria-modal="true"`)
+
+| Key         | Action                                                      |
+| ----------- | ----------------------------------------------------------- |
+| `Escape`    | Close the modal                                             |
+| `Tab`       | Move focus to next focusable; **trapped** inside the dialog |
+| `Shift+Tab` | Move focus to previous focusable; **trapped**               |
+| (on close)  | Focus restored to the trigger element                       |
+
+### Tabs (manual activation)
+
+| Key                        | Action                                      |
+| -------------------------- | ------------------------------------------- |
+| `ArrowLeft` / `ArrowRight` | Move focus between tabs (does not activate) |
+| `Home`                     | Focus first tab                             |
+| `End`                      | Focus last tab                              |
+| `Enter` / `Space`          | Activate the focused tab                    |
+
+Manual activation (Enter to activate) is preferred over automatic activation
+because it lets keyboard users review tab labels without firing tab panel
+loads. The pattern is per WAI-ARIA APG.
+
+### DropdownMenu (`role="menu"`)
+
+| Key                     | Action                                                |
+| ----------------------- | ----------------------------------------------------- |
+| `ArrowDown` / `ArrowUp` | Move focus between menu items                         |
+| `Home` / `End`          | Jump to first / last item                             |
+| `Enter` / `Space`       | Activate the focused item, close menu                 |
+| `Escape`                | Close menu, restore focus to trigger                  |
+| First letter            | Type-ahead: focus next item starting with that letter |
+
+### PageTree (`role="tree"`)
+
+| Key                     | Action                                               |
+| ----------------------- | ---------------------------------------------------- |
+| `ArrowDown` / `ArrowUp` | Move focus to next / previous visible node           |
+| `ArrowRight`            | If collapsed, expand; if expanded, focus first child |
+| `ArrowLeft`             | If expanded, collapse; if collapsed, focus parent    |
+| `Home` / `End`          | Focus first / last visible node                      |
+| `Enter`                 | Activate (select / fire `onSelect`)                  |
+
+### Calendar (`role="grid"`)
+
+| Key                               | Action                      |
+| --------------------------------- | --------------------------- |
+| `ArrowLeft` / `ArrowRight`        | Move 1 day                  |
+| `ArrowUp` / `ArrowDown`           | Move 1 week                 |
+| `PageUp` / `PageDown`             | Move 1 month                |
+| `Shift+PageUp` / `Shift+PageDown` | Move 1 year                 |
+| `Home` / `End`                    | Move to start / end of week |
+| `Enter` / `Space`                 | Select the focused date     |
+
+### CommandPalette (`role="combobox"` + `listbox`)
+
+| Key                     | Action                                                   |
+| ----------------------- | -------------------------------------------------------- |
+| `ArrowDown` / `ArrowUp` | Move active option (managed via `aria-activedescendant`) |
+| `Enter`                 | Activate the active option                               |
+| `Escape`                | Close the palette, restore focus                         |
+| Typing                  | Filters the listbox in real time                         |
+
+### DragDrop / KanbanBoard (keyboard reorder)
+
+| Key                                | Action                              |
+| ---------------------------------- | ----------------------------------- |
+| `Space` / `Enter` (on a draggable) | Pick up the item (enters drag mode) |
+| `ArrowKeys` (in drag mode)         | Move the item between drop targets  |
+| `Space` / `Enter` (in drag mode)   | Drop the item at the current target |
+| `Escape` (in drag mode)            | Cancel drag, return item to origin  |
+
+Movement and drop announcements are emitted via `role="status"
+aria-live="polite"` so screen reader users hear "Card moved to In Progress
+column, position 2 of 4" without needing to tab into the announcement
+region.
+
+### Tooltip / Popover
+
+| Key                  | Action                                       |
+| -------------------- | -------------------------------------------- |
+| `Escape`             | Dismiss (Tooltip) / Close (Popover)          |
+| `Tab` (Popover only) | Focus moves to next focusable inside popover |
+
+Tooltips are summoned by `:focus-visible` / `:hover` on the anchor; Popovers
+require a click or Enter on the anchor.
+
+### Accordion (Disclosure)
+
+| Key                           | Action          |
+| ----------------------------- | --------------- |
+| `Enter` / `Space` (on header) | Toggle expanded |
+
+(Each accordion section is an independent disclosure — no roving tabindex
+needed.)
+
+---
+
+## Color contrast
+
+WCAG AA: **4.5:1 for normal text**, **3:1 for large text and UI
+components**.
+
+The era system was designed with contrast in mind. The two foundational
+combinations both clear AA in **both** eras:
+
+| Foreground         | Background    | Heritage                        | Neon                                          |
+| ------------------ | ------------- | ------------------------------- | --------------------------------------------- |
+| `text-era-primary` | `bg-era-base` | `#2b1d10` on `#f6efe1` = 12.7:1 | `#e8ecff` on `#0b0e18` = 14.4:1               |
+| `text-era-muted`   | `bg-era-base` | `#6e5a3f` on `#f6efe1` = 4.8:1  | `rgba(232,236,255,0.55)` on `#0b0e18` ≈ 7.2:1 |
+
+Special cases that recur in components:
+
+### `text-white` (not `text-era-inverse`) on `bg-accent-600`
+
+This is the load-bearing invariant for filled-accent buttons.
+`text-era-inverse` resolves to `#fbf5e8` (parchment) in Heritage and
+`#0b0e18` (void) in Neon. On `bg-accent-600` (`#8A5030` Heritage,
+`#5A50FF` Neon), the void inverse fails AA in Neon (1.6:1).
+
+Use `text-white` instead. White on `bg-accent-600` passes AA in both eras
+(5.6:1 Heritage, 4.7:1 Neon).
+
+```tsx
+// ❌ Wrong — fails AA in Neon
+<button className="bg-accent-600 text-era-inverse">Save</button>
+
+// ✅ Right — passes AA in both eras
+<button className="bg-accent-600 text-white">Save</button>
+```
+
+### `--era-accent-strong` for active text on neutral surfaces
+
+When a tab label, link, or selected menu item should read as the brand
+color _on the era surface_, plain `text-accent-700` fails AA in Neon
+(`#443cdc` on `#0b0e18` = 2.7:1). Use the era-aware bright accent:
+
+```tsx
+<span style={{ color: "rgb(var(--era-accent-strong))" }}>Active tab</span>
+```
+
+This resolves to `accent-700` in Heritage (terracotta, 7.6:1 on hanji) and
+`accent-300` in Neon (bright blue, 8.96:1 on the void). Both AAA. See
+`Foundations/Tokens` for the full rationale.
+
+---
+
+## Patterns and invariants
+
+These are the rules every contributor must internalize. Each one closed a
+recurring class of axe violations during the Wave 5b waves.
+
+### 1. No opacity ramps in entry animations
+
+Axe samples the page _during_ transitions, not only on settled state. An
+element transitioning from `opacity: 0` to `opacity: 1` over 380ms will
+read as a contrast violation at every intermediate frame, even though the
+final state is fine.
+
+The fix: **transform-only entry keyframes**, gated on `motion-safe:`.
+
+```tsx
+// ❌ Wrong — causes intermittent color-contrast violations
+<div className="motion-safe:animate-fade-in"> {/* opacity 0 → 1 */}
+
+// ✅ Right — transform stays opaque end-to-end
+<div className="motion-safe:animate-slide-in-up"> {/* translateY only */}
+```
+
+The `animations.ts` library's entry keyframes (`slide-in-up`,
+`scale-in`, `ink-spread`) are all transform / filter only.
+`fade-in` exists for cases where opacity ramping is acceptable
+(decorative non-text overlays) but should **never** be applied to text or
+interactive elements.
+
+### 2. `role="img"` on visual previews labelled with `aria-label`
+
+Axe's `aria-prohibited-attr` rule fires when `aria-label` is applied to
+elements that aren't named landmarks. A `<span aria-label="celadon vase">`
+without a role gets flagged.
+
+```tsx
+// ❌ Wrong — aria-label on a generic span
+<span aria-label="celadon vase" className="...">🏺</span>
+
+// ✅ Right — declare the role explicitly
+<span role="img" aria-label="celadon vase" className="...">🏺</span>
+```
+
+This applies to: emoji avatars, color swatches in stories, decorative
+icons that _do_ convey meaning to screen readers. For purely decorative
+visuals that screen readers should skip, use `aria-hidden="true"` instead.
+
+### 3. `text-white` over `text-era-inverse` on accent backgrounds
+
+(See "Color contrast" above.) The TL;DR: `text-era-inverse` flips per era
+and fails AA in Neon when painted on `bg-accent-600`. White is era-static
+and passes both eras. The Button, Badge, Tag, Toast, and any other filled
+accent surface uses `text-white`.
+
+### 4. `waitFor` for transition-settled state in play functions
+
+Story play functions that assert post-transition contrast must wait for
+the transition to finish. The era-aware transition is `transition-colors
+duration-era`, which is **380ms in Heritage** and **220ms in Neon**.
+
+```tsx
+// ❌ Wrong — asserts mid-transition, intermittently fails
+await userEvent.click(canvas.getByRole("tab", { name: "Two" }));
+await expect(canvas.getByRole("tab", { name: "Two" })).toHaveAccessibleName(
+  "Two",
+);
+
+// ✅ Right — wait past 380ms upper bound
+import { waitFor } from "@storybook/test";
+await userEvent.click(canvas.getByRole("tab", { name: "Two" }));
+await waitFor(
+  () => {
+    expect(
+      canvas.getByRole("tab", { name: "Two", selected: true }),
+    ).toBeInTheDocument();
+  },
+  { timeout: 500 }, // > 380ms Heritage upper bound
+);
+```
+
+Default `waitFor` timeout is 1000ms, which is enough headroom; the
+explicit value documents the invariant.
+
+---
+
+## Live region announcements
+
+The two components with custom drag interactions emit screen reader
+announcements via a polite live region:
+
+| Component     | Announces                                                                                               | Region                                               |
+| ------------- | ------------------------------------------------------------------------------------------------------- | ---------------------------------------------------- |
+| `DragDrop`    | "Item picked up" / "Item moved to position N of M" / "Item dropped" / "Drag cancelled"                  | `role="status" aria-live="polite"` (visually hidden) |
+| `KanbanBoard` | "Card picked up from {column}" / "Card moved to {column}, position N of M" / "Card dropped in {column}" | `role="status" aria-live="polite"` (visually hidden) |
+
+The region uses `polite` (not `assertive`) so announcements queue rather
+than interrupting current speech. Visually hidden via `sr-only` (Tailwind
+utility) — never `display: none` (which would also hide the region from
+screen readers).
+
+For Toast and Alert, similar semantics apply: Toast uses
+`role="status" aria-live="polite"`; Alert uses `role="alert"` (which
+implies `aria-live="assertive"`) for genuine emergencies.
+
+---
+
+## Reduced motion
+
+All entry and emphasis animations are gated on the `motion-safe:` prefix:
+
+```tsx
+<div className={cn(
+  "transition-transform duration-era ease-era-brush",
+  "motion-safe:animate-slide-in-up",
+)}>
+```
+
+Tailwind's `motion-safe:` variant only applies the classed when
+`prefers-reduced-motion: no-preference` is true. When the user has
+`prefers-reduced-motion: reduce`, the animation drops out entirely;
+the underlying transition (which uses `duration-era`) is preserved but
+is short enough to be acceptable, and falls back to instant if the user's
+OS / browser overrides transitions globally.
+
+For animations that should respect reduced motion _and_ still convey
+state change, pair `motion-safe:` with a non-animated fallback that uses
+the same final state:
+
+```tsx
+<div className={cn(
+  // Both: final state styling
+  "translate-y-0 opacity-100",
+  // Motion-safe only: the entry animation
+  "motion-safe:animate-slide-in-up",
+)}>
+```
+
+---
+
+## Testing
+
+### Local — single story
+
+```bash
+npm run dev   # Storybook on http://localhost:6006
+```
+
+Open the **Accessibility** addon panel (bottom). Each story shows live
+axe results in three buckets: Violations, Passes, Incomplete. The CI gate
+fails on any Violation with `impact: serious` or `impact: critical`.
+
+### Local — full sweep
+
+```bash
+npm run test-storybook:ci
+```
+
+Runs Playwright + axe across every story. Output looks like:
+
+```
+PASS  [chromium]  stories/Button.stories.tsx > Primary
+PASS  [chromium]  stories/Button.stories.tsx > Disabled
+FAIL  [chromium]  stories/Card.stories.tsx > Outlined
+       Detected 1 accessibility violation:
+       1) color-contrast: Elements must meet minimum color contrast ratio thresholds
+          - Element: <p class="text-era-muted">…
+          - Targets: ".text-era-muted"
+          - Impact: serious
+```
+
+Each failure includes the violating selector, the WCAG criterion, and
+typically a contrast ratio. The fix is almost always one of:
+
+- Swap `text-era-inverse` for `text-white` on a filled accent surface
+- Swap `text-accent-700` for `rgb(var(--era-accent-strong))` on a neutral
+  surface
+- Add `role="img"` to a `<span aria-label>`
+- Replace an opacity-based entry animation with a transform-based one
+
+### CI
+
+The same `test-storybook:ci` command runs on every push. The pre-push
+checklist (`format`, `lint:fix`, `typecheck`, `test`) does **not** run
+the Storybook a11y sweep — that gate is enforced at PR time. If you're
+about to land a wave of new components, run it locally first.
+
+---
+
+## When you find a new violation
+
+1. Reproduce the violation on the failing story (don't trust CI alone).
+2. Identify which invariant it belongs to (most violations fit one of
+   the four patterns above).
+3. Fix the _token usage_, not the token itself. The era tokens are
+   contrast-verified; the bug is almost always a wrong token at the call
+   site.
+4. If the violation reveals a genuine token gap (rare), file an issue
+   with the failing combination and propose a new token name. Don't
+   silently hardcode.
+
+---
+
+## Cross-reference
+
+- **`Foundations/Era`** — the era contract that drives `--era-accent-strong`
+- **`Foundations/Tokens`** — full token inventory and migration guide
+- **`Foundations/Colors`** — palette swatches and contrast pairs
+- **`Foundations/Animations`** — keyframe library (transform-only entries)
+- **`Components/Modal`**, **`Components/Tabs`**, **`Components/DropdownMenu`**,
+  **`Components/Calendar`**, **`Components/CommandPalette`**,
+  **`Components/PageTree`**, **`Components/DragDrop`**,
+  **`Components/KanbanBoard`** — per-component a11y story coverage

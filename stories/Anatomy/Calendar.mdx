@@ -1,0 +1,273 @@
+import { Meta } from "@storybook/blocks";
+
+<Meta title="Anatomy/Calendar" />
+
+# Calendar — Anatomy, Do·Don't, Spec
+
+`Calendar` is a single-month date-picker grid that implements the
+WAI-ARIA Grid pattern with a **roving tabindex** (one cell tabbable at a
+time, replacing the legacy ~42-stops-per-month behaviour). It exposes
+keyboard navigation across days, weeks, months, and years; respects an
+optional `disabledDate` predicate plus `minDate` / `maxDate` bounds; and
+formats month titles + weekday headers via `Intl.DateTimeFormat` when a
+`locale` is supplied (Wave 5b2-A7).
+
+This page is the contract: the grid parts you can rely on, every key
+the component handles, and the patterns to avoid when you reach beyond
+the supplied props.
+
+---
+
+## Anatomy
+
+```
+┌──────────────────────────────────────────┐
+│  ‹    2026年 5月    ›                     │ ← header (h5 + nav buttons)
+├──┬──┬──┬──┬──┬──┬──┤
+│日│月│火│水│木│金│土│                       │ ← weekday row (role="row" + columnheaders)
+├──┼──┼──┼──┼──┼──┼──┤
+│  │  │  │  │  │ 1│ 2│                       │ ← week row (role="row")
+│ 3│ 4│ 5│ 6│ 7│ 8│ 9│   ▢ = enabled cell    │   • date cells = role="gridcell"
+│10│11│12│13│14│15│16│   ▣ = today           │   • only ONE has tabIndex=0
+│17│18│19│20│21│22│23│   ◆ = selected        │   • aria-selected on selected
+│24│25│26│27│28│29│30│   ⊘ = disabled        │   • aria-current="date" on today
+│31│  │  │  │  │  │  │                       │
+└──┴──┴──┴──┴──┴──┴──┘
+```
+
+| Part            | Element             | Role / attributes                                                                                |
+| --------------- | ------------------- | ------------------------------------------------------------------------------------------------ |
+| **Root**        | `<div>`             | Container, forwards ref, era-aware card surface (`bg-era-raised border-era`)                     |
+| **Header**      | `<div>` + `<h5>`    | Month title + prev/next buttons (`aria-label="이전 달"` / `"다음 달"`)                            |
+| **Grid**        | `<div>`             | `role="grid"`, `aria-label` (defaults to `"달력"`), receives all keyboard input                  |
+| **Weekday row** | `<div>` (row) + 7×`<div>` (columnheader) | `role="row"` + `role="columnheader"`, labels rotated by `weekStartsOn`             |
+| **Week rows**   | 6 × `<div role="row">` | One row per week — exactly 6 rows of 7 cells = 42 cells (always)                              |
+| **Day cell**    | `<button type="button">` | `role="gridcell"`, `tabIndex={0 \| -1}`, `aria-selected`, `aria-current="date"?`, `aria-disabled?` |
+
+Out-of-month padding cells (the leading/trailing days that fill the 6×7
+grid) render as `muted` — `text-era-muted` only, **no** `opacity-*` —
+so axe colour-contrast sampling stays stable (see CLAUDE.md
+**Conventions Discovered** #1).
+
+---
+
+## Props
+
+| Prop              | Type                                            | Default            | Notes                                                                                       |
+| ----------------- | ----------------------------------------------- | ------------------ | ------------------------------------------------------------------------------------------- |
+| `value`           | `string` (`yyyy-mm-dd`)                         | —                  | Controlled selection.                                                                        |
+| `defaultValue`    | `string`                                        | —                  | Uncontrolled initial selection.                                                              |
+| `onChange`        | `(date: string) => void`                        | —                  | Fires on click or Enter/Space when a non-disabled cell is activated.                         |
+| `defaultMonth`    | `Date`                                          | `today`            | Initial visible month. Independent of `defaultValue`.                                        |
+| `dayOfWeekLabels` | `ReadonlyArray<string>`                         | `["日","月","火","水","木","金","土"]` | Sunday-first; the component rotates to match `weekStartsOn`.            |
+| `disabledDate`    | `(iso: string) => boolean`                      | —                  | Predicate marking ISO dates as disabled. Keyboard nav skips past them.                       |
+| `minDate`         | `string` (`yyyy-mm-dd`)                         | —                  | Inclusive lower bound. Anything before is disabled.                                          |
+| `maxDate`         | `string` (`yyyy-mm-dd`)                         | —                  | Inclusive upper bound. Anything after is disabled.                                           |
+| `weekStartsOn`    | `0 \| 1 \| 2 \| 3 \| 4 \| 5 \| 6`               | `0` (Sunday)       | First column of the week. `1` = Monday (ISO), etc.                                           |
+| `locale`          | `string` (BCP-47)                               | —                  | When set, the month title + default weekday labels use `Intl.DateTimeFormat`.                |
+| `aria-label`      | `string`                                        | `"달력"`           | Label for the `role="grid"` element.                                                         |
+| `className`       | `string`                                        | —                  | Composed via `cn()` onto the root `<div>`.                                                   |
+
+See **`Components/Calendar`** for the autodocs prop table and the
+rendered control playground.
+
+---
+
+## Do
+
+### Do — bound the picker with `minDate` / `maxDate`
+
+```tsx
+<Calendar
+  defaultValue="2026-05-09"
+  minDate="2026-05-01"
+  maxDate="2026-05-31"
+  onChange={setDate}
+/>
+```
+
+The bounds are evaluated lexicographically on the ISO strings (safe
+because `yyyy-mm-dd` zero-pads every field), so they short-circuit
+without `new Date()` round-trips. Disabled cells get `aria-disabled`,
+visual `line-through`, and keyboard nav steps past them.
+
+### Do — combine `disabledDate` with bounds for business rules
+
+```tsx
+const isWeekend = (iso: string) => {
+  const d = new Date(iso).getDay();
+  return d === 0 || d === 6;
+};
+
+<Calendar
+  minDate="2026-01-01"
+  maxDate="2026-12-31"
+  disabledDate={isWeekend}
+  weekStartsOn={1}
+  onChange={setDate}
+/>;
+```
+
+`disabledDate` runs in addition to `minDate` / `maxDate`. Keep the
+predicate pure and cheap — it is called once per visible cell per
+render (42 cells), once per keyboard step.
+
+### Do — set `locale` for non-Korean tooltips and weekday headers
+
+```tsx
+<Calendar locale="en-US" weekStartsOn={0} onChange={setDate} />
+{/* Header: "May 2026", weekday row: "Sun Mon Tue Wed Thu Fri Sat" */}
+
+<Calendar locale="ja-JP" weekStartsOn={1} onChange={setDate} />
+{/* Header: "2026年5月", weekday row Monday-first */}
+```
+
+`locale` formats the title via `Intl.DateTimeFormat({ year: "numeric",
+month: "long" })` and the weekday row via `{ weekday: "short" }`. When
+omitted, the title is the legacy CJK form (`2026年 5月`) and the
+weekday row is the kanji default. `dayOfWeekLabels` always wins over
+both.
+
+### Do — render the empty / no-events state in surrounding chrome
+
+`Calendar` has no events / annotations API in this iteration. When
+zero events should be conveyed for the visible month, render an
+`<EmptyState>` in the **sibling** card (sidebar, summary panel) — keep
+the grid itself keyboard-navigable. See **`Patterns/Empty States`**
+("Calendar — natural empty state") for the canonical pattern.
+
+### Do — pin `defaultMonth` independently of `defaultValue`
+
+```tsx
+{/* Open on this month even if the value is from last year. */}
+<Calendar defaultValue="2025-12-15" defaultMonth={new Date(2026, 4, 1)} />
+```
+
+The two props are independent: `defaultValue` seeds the persistent
+selection, `defaultMonth` seeds the visible page. Useful for
+"return-to-last" pickers that shouldn't yank the user back.
+
+---
+
+## Don't
+
+### Don't — visually disable cells with `opacity-*`
+
+```tsx
+{/* ❌ Wrong — opacity ramps fail axe colour-contrast sampling. */}
+.calendar-disabled-day { opacity: 0.4; }
+```
+
+The component uses `text-era-muted` + `line-through` for the disabled
+treatment. This is a Wave 5b2 contract — opacity ramps fail axe
+colour-contrast sampling mid-frame and cannot be relied on for state
+indication. See CLAUDE.md **Conventions Discovered** #1.
+
+### Don't — feed `Date` objects through `onChange` consumers
+
+```tsx
+{/* ❌ Wrong — onChange emits an ISO string, not a Date. */}
+<Calendar onChange={(d: Date) => setDate(d)} />
+```
+
+`onChange` always emits a `yyyy-mm-dd` string. Parse to `Date` at the
+boundary if you need it; the string format is timezone-stable and
+URL-safe.
+
+### Don't — disable every cell in the visible month and expect navigation
+
+`walkToEnabled()` bounds the keyboard skip walk at 366 iterations so a
+fully-disabled future does not lock keyboard nav, but the focus may
+land far outside the visible month. If your `disabledDate` is
+"everything", render an `<EmptyState>` instead of the calendar.
+
+### Don't — render `Calendar` for date *ranges*
+
+```tsx
+{/* ❌ Wrong — Calendar is single-date only in this iteration. */}
+<Calendar value={[start, end]} onChange={(range) => ...} />
+```
+
+The `value` is a single ISO string. For range pickers, compose two
+calendars side-by-side and manage the bounds in the parent — there is
+no built-in range mode.
+
+### Don't — override the `role="grid"` semantics
+
+Calendar's `role="grid"` is what enables AT to announce the column /
+row structure and the "first/last cell" Home/End shortcuts. Wrapping
+in another `role="grid"` (e.g. inside a `<table>`) double-counts the
+structure for AT.
+
+---
+
+## Spec — keyboard / focus / motion / a11y contract
+
+### Keyboard
+
+| Key                   | Behaviour                                                                                       |
+| --------------------- | ----------------------------------------------------------------------------------------------- |
+| `ArrowLeft`           | Focus previous day. Skips past disabled cells (walks ≤366 iterations).                          |
+| `ArrowRight`          | Focus next day. Skips past disabled cells.                                                      |
+| `ArrowUp`             | Focus same column, previous week (-7 days). Skips disabled.                                     |
+| `ArrowDown`           | Focus same column, next week (+7 days). Skips disabled.                                         |
+| `Home`                | Focus first column of current week (respects `weekStartsOn`).                                   |
+| `End`                 | Focus last column of current week.                                                              |
+| `PageUp`              | Focus same day-of-month in previous month (clamped to the month's last valid day).              |
+| `PageDown`            | Focus same day-of-month in next month (clamped).                                                |
+| `Shift+PageUp`        | Focus same day-of-month one year earlier.                                                       |
+| `Shift+PageDown`      | Focus same day-of-month one year later.                                                         |
+| `Enter` / `Space`     | **Select** the focused day. Fires `onChange`. No-op when the cell is disabled.                  |
+
+The keyboard handler runs once on the `role="grid"` element — the per-cell
+buttons just receive focus. This keeps all 42 cells in a single event
+listener instead of 42.
+
+### Focus
+
+- Wave 5b2 contract: **one cell tabbable at a time**. Only the cell
+  matching `focusedDate` carries `tabIndex=0`; all others are
+  `tabIndex=-1`. The grid is **one** Tab stop in the page sequence.
+- Initial `focusedDate` resolution: `defaultValue` → today (if visible)
+  → 1st of `defaultMonth`.
+- Focus moves to the new cell after every Arrow / Page / Home / End
+  press via a `useEffect` keyed on `focusedDate + view` — never on
+  the initial mount (we do not steal focus on render).
+- Click on a non-disabled cell selects + moves focus.
+- Focus ring: `ring-2 ring-[rgb(var(--accent-500))]
+  ring-offset-1` — visible on both eras.
+
+### Motion
+
+- Cell hover / focus transitions use `duration-era-fast ease-era-brush`.
+- No opacity ramps in any state. Disabled de-emphasis is `text-era-muted`
+  + `line-through`; muted (out-of-month) is `text-era-muted` only.
+- Selected-cell text is era-conditional: Heritage uses `text-era-inverse`
+  (cream on terracotta `#fbf5e8` on `#8a5030`, ~6.2:1), Neon overrides
+  to `text-white` (white on cool accent-600 `#5a50ff`, ~4.7:1) — the
+  default `text-era-inverse` would only reach ~3.7:1 on Neon and fail
+  WCAG AA. See `Calendar.styles.ts` for the override comment.
+
+### A11y contract
+
+- `role="grid"` on the date area, `aria-label` on the grid.
+- Weekday header is `role="row"` + 7× `role="columnheader"`.
+- Each week is `role="row"`; each cell is `role="gridcell"` on a
+  `<button type="button">` so AT correctly announces "button" / "selected"
+  / "disabled".
+- Today is marked with `aria-current="date"` (in addition to its visual
+  `text-accent-700 font-bold` styling).
+- Selected day carries `aria-selected="true"`.
+- Disabled cells carry `aria-disabled="true"` and are skipped by the
+  keyboard walk; they remain in the DOM so the row structure stays
+  intact.
+- WCAG 2.1 AA contrast: passes on both eras for normal, today, selected,
+  muted, and disabled treatments.
+
+### Cross-references
+
+- **`Components/Calendar`** — autodocs, all stories, interactive playground
+- **`Patterns/Empty States`** — Calendar's natural empty state convention
+- **`Foundations/Accessibility`** — roving-tabindex grid pattern
+- **WAI-ARIA Authoring Practices — Date Picker Dialog / Grid** — the
+  upstream pattern

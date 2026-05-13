@@ -1,0 +1,148 @@
+name: Release
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  gates:
+    uses: ./.github/workflows/ci.yml
+    permissions:
+      contents: read
+
+  publish:
+    needs: gates
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      skipped: ${{ steps.skip-check.outputs.skip }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4.3.1
+        with:
+          fetch-depth: 0
+
+      - name: Verify tag is on main ancestry
+        run: |
+          git fetch origin main
+          TAG_SHA=$(git rev-list -n 1 "${{ github.event.release.tag_name }}")
+          if ! git merge-base --is-ancestor "$TAG_SHA" origin/main; then
+            echo "::error::Tag ${{ github.event.release.tag_name }} (commit $TAG_SHA) is not an ancestor of origin/main. Refusing to publish."
+            exit 1
+          fi
+
+      - name: Verify tag matches package.json version
+        id: version
+        run: |
+          TAG="${{ github.event.release.tag_name }}"
+          TAG_VERSION="${TAG#v}"
+          PKG_VERSION=$(node -p "require('./package.json').version")
+          if [ "$TAG_VERSION" != "$PKG_VERSION" ]; then
+            echo "::error::Tag version ($TAG_VERSION) does not match package.json version ($PKG_VERSION)."
+            exit 1
+          fi
+          echo "version=$PKG_VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Setup Node + auth
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020  # v4.4.0
+        with:
+          node-version: "20"
+          registry-url: "https://npm.pkg.github.com"
+          scope: "@jyi"
+          always-auth: true
+          cache: "npm"
+
+      - name: Idempotency guard — skip if version already exists
+        id: skip-check
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          if npm view "@jyi/design-system@${VERSION}" version --silent 2>/dev/null | grep -q "${VERSION}"; then
+            echo "::notice::Version ${VERSION} already published. Skipping."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Install
+        if: steps.skip-check.outputs.skip != 'true'
+        run: npm ci
+
+      - name: Build
+        if: steps.skip-check.outputs.skip != 'true'
+        run: npm run build
+
+      - name: Pack check
+        if: steps.skip-check.outputs.skip != 'true'
+        run: npm run pack:check
+
+      - name: Publish
+        if: steps.skip-check.outputs.skip != 'true'
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npm publish --provenance --access restricted
+
+  smoke-test:
+    needs: publish
+    if: needs.publish.outputs.skipped != 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4.3.1
+
+      - name: Setup Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020  # v4.4.0
+        with:
+          node-version: "20"
+          registry-url: "https://npm.pkg.github.com"
+          scope: "@jyi"
+          always-auth: true
+
+      - name: Wait for registry propagation
+        run: sleep 30
+
+      - name: Install in clean dir and verify imports
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          VERSION="${{ needs.publish.outputs.version }}"
+          SMOKE_DIR=$(mktemp -d)
+          cd "$SMOKE_DIR"
+          cat > package.json <<'EOF'
+          { "name": "smoke", "version": "0.0.0", "private": true, "type": "module" }
+          EOF
+          cat > .npmrc <<EOF
+          @jyi:registry=https://npm.pkg.github.com
+          //npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}
+          EOF
+          npm install "@jyi/design-system@${VERSION}"
+          node --input-type=module -e "
+            import { Button } from '@jyi/design-system';
+            import { cn, applyEra } from '@jyi/design-system/core';
+            import preset from '@jyi/design-system/tailwind-preset';
+            if (typeof Button !== 'function' && typeof Button !== 'object') throw new Error('Button export missing');
+            if (typeof cn !== 'function') throw new Error('cn export missing');
+            if (typeof applyEra !== 'function') throw new Error('applyEra export missing');
+            if (!preset || typeof preset !== 'object') throw new Error('tailwind-preset default export missing');
+            console.log('Imports OK');
+          "
+          test -f node_modules/@jyi/design-system/dist/styles.css || { echo 'styles.css missing'; exit 1; }
+          test -f node_modules/@jyi/design-system/dist/eras/heritage.css || { echo 'heritage.css missing'; exit 1; }
+          test -f node_modules/@jyi/design-system/dist/eras/neon.css || { echo 'neon.css missing'; exit 1; }
+          echo 'Smoke test passed'

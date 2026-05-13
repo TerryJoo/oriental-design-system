@@ -1,0 +1,221 @@
+import { Meta } from "@storybook/blocks";
+
+<Meta title="Anatomy/Tooltip" />
+
+# Tooltip — Anatomy, Do/Don't, Spec
+
+Tooltip is a transient label that augments — never replaces — a focusable
+trigger. It implements the WAI-ARIA Tooltip pattern: the bubble carries
+`role="tooltip"` and a generated id, and the trigger is cloned with
+`aria-describedby` while open. The component opens on hover _and_ focus, so
+it is keyboard-reachable for free.
+
+For the full prop reference and live placement matrix, see
+[Components/Tooltip](?path=/docs/components-tooltip--docs).
+
+---
+
+## Anatomy
+
+```
+                  ② <span id role="tooltip">
+                  ┌──────────────────────────┐
+                  │  bubble content          │   ← era-aware ink surface
+                  └────────────┬─────────────┘
+                               │ placement
+                               ▼
+       ① <span> wrapper ─────────────────────────────
+       ┌───────────────────────────────────────┐
+       │  ③ trigger (cloned with aria-describedby) │
+       └───────────────────────────────────────┘
+```
+
+| #   | Part    | Source                                                                                                                           |
+| --- | ------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| ①   | Wrapper | `<span class="relative inline-block">` from `tooltipWrapStyles`. Hosts `onMouseEnter/Leave`, `onFocus/Blur`.                     |
+| ②   | Bubble  | `<span role="tooltip" id={tooltipId}>` rendered with `tooltipBubbleStyles`. Uses `--era-ink-primary` ink + `shadow-era-tooltip`. |
+| ③   | Trigger | The single React element passed as `children`. Cloned to merge `aria-describedby={tooltipId}` while open.                        |
+
+The trigger is enforced via `Children.only` plus an `isValidElement` check —
+non-element children (strings, fragments, arrays) throw at render with a
+message asking you to wrap them in a focusable element. This guarantees the
+`aria-describedby` wiring always lands on a real element that AT can read.
+
+The bubble is positioned via the `placement` prop (`top` · `bottom` · `left` ·
+`right`) which selects one of four absolute-position presets:
+
+| `placement` | Class fragment                               |
+| ----------- | -------------------------------------------- |
+| `top`       | `bottom-full left-1/2 -translate-x-1/2 mb-2` |
+| `bottom`    | `top-full left-1/2 -translate-x-1/2 mt-2`    |
+| `left`      | `right-full top-1/2 -translate-y-1/2 mr-2`   |
+| `right`     | `left-full top-1/2 -translate-y-1/2 ml-2`    |
+
+Open / closed state is conveyed by `opacity-0` ↔ `opacity-100` on the bubble.
+There is **no opacity transition** — see Spec for why.
+
+---
+
+## Props (grouped)
+
+The full table lives in [Components/Tooltip](?path=/docs/components-tooltip--docs).
+Quick groups:
+
+- **Content** — `content` (`ReactNode`, the bubble body), `children` (the trigger element, single React element only).
+- **Placement** — `placement` (`top` · `bottom` · `left` · `right`, default `top`).
+- **Manual control** — `open?` (boolean override; useful for testing or programmatic control). When omitted, the bubble follows hover-or-focus state.
+- **Native** — extends `HTMLAttributes<HTMLSpanElement>` (minus `content`), so you can pass `className`, `data-*`, etc., to the wrapper span.
+
+---
+
+## Do
+
+```tsx
+// ✅ Wrap a focusable element so keyboard users get the tooltip too.
+<Tooltip content="저장 (Cmd+S)">
+  <Button variant="primary">저장</Button>
+</Tooltip>
+```
+
+```tsx
+// ✅ Use the tooltip to expose a shortcut hint or non-essential context —
+//    never primary content.
+<Tooltip content="마지막 저장: 2분 전">
+  <button type="button" aria-label="저장 상태">
+    <ClockIcon aria-hidden="true" />
+  </button>
+</Tooltip>
+```
+
+```tsx
+// ✅ For non-interactive elements that still need a tooltip, supply a
+//    focusable wrapper so keyboard users can reach it.
+<Tooltip content="청자 — Heritage 팔레트">
+  <span
+    tabIndex={0}
+    role="img"
+    aria-label="celadon swatch"
+    className="w-6 h-6 rounded bg-celadon-500"
+  />
+</Tooltip>
+```
+
+```tsx
+// ✅ Pick a placement that won't clip — bottom for top-of-viewport
+//    triggers, top for bottom-of-viewport triggers.
+<Tooltip content="추가 옵션" placement="bottom">
+  <Button size="sm" variant="ghost" leftIcon={<MoreIcon />}>
+    ...
+  </Button>
+</Tooltip>
+```
+
+```tsx
+// ✅ Long copy is now safe — Wave 5b2-C3 added wrapping. The bubble
+//    bounds at 16rem with `whitespace-normal`.
+<Tooltip content="이 작업은 되돌릴 수 없습니다. 신중히 진행하세요.">
+  <Button variant="danger">영구 삭제</Button>
+</Tooltip>
+```
+
+---
+
+## Don't
+
+```tsx
+// ❌ Multi-element children — Children.only throws at render.
+<Tooltip content="?">
+  <span>icon</span>
+  <span>label</span>
+</Tooltip>
+```
+
+```tsx
+// ❌ Non-element children — strings can't receive aria-describedby.
+//    Throws with a helpful message asking you to wrap in a focusable element.
+<Tooltip content="?">click here</Tooltip>
+```
+
+```tsx
+// ❌ A tooltip wrapping a non-focusable element — keyboard users cannot
+//    summon it. Make the wrapper tabbable or wrap in a <button>.
+<Tooltip content="meaningful info">
+  <span>some text</span>
+</Tooltip>
+```
+
+```tsx
+// ❌ Putting load-bearing content in the tooltip — it disappears on
+//    blur/mouseleave and can't be revisited without re-triggering.
+<Tooltip content="결제 카드 번호: ****-1234">
+  <Button>카드 정보</Button>
+</Tooltip>
+```
+
+```tsx
+// ❌ Using a tooltip for a confirm prompt — that's a Popover (interactive,
+//    keeps focus inside) or Modal (interruptive). Tooltips are passive.
+<Tooltip content={<button onClick={confirm}>OK</button>}>
+  <Button>Delete</Button>
+</Tooltip>
+```
+
+---
+
+## Spec
+
+### Keyboard
+
+| Key          | Action                                                                                                                                                                  |
+| ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Tab`        | Move focus to the trigger → tooltip opens automatically.                                                                                                                |
+| `Tab` (away) | Focus leaves the trigger → tooltip closes (blur).                                                                                                                       |
+| `Escape`     | (browser default) Does not currently dismiss the tooltip — focus-out is the canonical close. The tooltip is non-interactive, so consumers rarely need explicit dismiss. |
+
+Hover open / leave is bound to `onMouseEnter` / `onMouseLeave` on the wrapper.
+Focus open / close is bound to `onFocus` / `onBlur` on the same wrapper, which
+bubbles from the trigger.
+
+### Focus
+
+- Focus stays on the trigger while the tooltip is open. The bubble itself
+  is `pointer-events-none` and is **never** a focus target.
+- No focus-restore behavior is needed — the tooltip never moves focus.
+
+### Motion
+
+- The bubble snaps between `opacity-0` and `opacity-100` with **no
+  transition**. This is intentional: the placement classes write into
+  Tailwind's `--tw-translate-*` variables, so any `transform: scale()` keyframe
+  would shadow those and break centering during the animation. And per the
+  [no-opacity-ramp invariant](?path=/docs/foundations-accessibility--docs),
+  axe samples mid-fade and reports the foreground anchor against
+  partially-transparent ink as a contrast violation.
+- The wrapper inherits `transition-colors duration-era ease-era-brush` from
+  the surrounding surface for tonal era transitions, but the bubble itself
+  does not animate fill or transform.
+
+### a11y contract
+
+- Bubble: `role="tooltip"` with a generated `id` from `useId()`.
+- Trigger: cloned via `cloneElement` to receive `aria-describedby={tooltipId}`
+  _while open_ (merged with any existing consumer-provided value). On close,
+  the tooltip id is removed from the merged list — so the trigger never
+  references a hidden element.
+- The trigger contract is enforced — passing anything other than a single
+  React element throws with a message pointing the consumer to a focusable
+  wrapper.
+- **Wave 5b2-C3 invariant**: bubble uses `whitespace-normal max-w-[16rem]` so
+  long copy wraps inside the bubble rather than pushing it off-canvas. If you
+  need a single-line tooltip, override via `className`.
+- Bubble surface uses `--era-ink-primary` background with `text-era-inverse`
+  foreground — this combination is contrast-verified in both eras.
+
+---
+
+## Cross-references
+
+- [Components/Tooltip](?path=/docs/components-tooltip--docs) — full prop table, every placement story.
+- [Components/Popover](?path=/docs/components-popover--docs) — interactive sibling for click-to-open content with focusable contents.
+- [Foundations/Accessibility](?path=/docs/foundations-accessibility--docs) — Tooltip pattern, opacity-ramp invariant, dismiss semantics.
+- [Foundations/Era](?path=/docs/foundations-era--docs) — `--era-ink-primary` and `shadow-era-tooltip` token resolution.

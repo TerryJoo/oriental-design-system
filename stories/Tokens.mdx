@@ -1,0 +1,359 @@
+import { Meta } from "@storybook/blocks";
+
+<Meta title="Foundations/Tokens" />
+
+# Tokens — the source of truth
+
+Every visual decision in this system is encoded as a **token**: a named value
+(or a `var(--…)` reference) declared in `src/tokens/*.ts` and surfaced as a
+Tailwind utility via `tailwind.preset.ts`. Components compose those
+utilities; they never inline raw color, shadow, radius, font-size, or
+duration values.
+
+This page is the narrative companion to the visual swatches. For palette
+chips, see `Foundations/Colors`. For runtime values, see `Foundations/CSS
+Variables`. For shadow elevations, see `Foundations/Shadows`. For the
+animation library, see `Foundations/Animations`.
+
+---
+
+## The tokens-first principle
+
+`CLAUDE.md` codifies this rule:
+
+> **Tokens first** — reach for `src/tokens/` and tailwind preset tokens
+> before hardcoding any color, shadow, radius, duration, or font size. If no
+> matching token exists, ask the user whether to (1) add a token or
+> (2) hardcode — never silently hardcode.
+
+The reasons:
+
+1. **Era switching only works if components read tokens.** A hex literal
+   `#fbf5e8` is correct for Heritage _today_ and wrong for Neon _forever_.
+   Use `bg-era-raised` and the same line of code paints both eras correctly.
+2. **Brand changes are one-line edits.** `--accent-600` is a single CSS
+   variable. Switching the brand from terracotta to indigo means swapping
+   one entry in `src/themes/era/heritage.ts`, not grepping the codebase.
+3. **Accessibility is enforceable.** Tokens are audited centrally. A raw
+   `style={{ color: '#999' }}` slips through review; `text-era-muted` is
+   versioned and contrast-verified.
+4. **Tests stay declarative.** Style assertions in Vitest iterate the
+   variant map from `*.styles.ts`. Hardcoded class strings duplicate the
+   map and rot the moment the token changes.
+
+When you need a value that doesn't exist as a token, the protocol is:
+**ask first, then add a token, then use it.** Never silently hardcode.
+
+---
+
+## 오방색 (obangsaek) — the 5 cardinal palette
+
+The system's color identity is rooted in 오방색, the five traditional
+Korean cardinal colors. Each axis is era-static — you can use these in both
+Heritage and Neon without per-era overrides.
+
+| 오방색                     | Direction | Token group                                                            | Tailwind utility                      | Notes                                                                                      |
+| -------------------------- | --------- | ---------------------------------------------------------------------- | ------------------------------------- | ------------------------------------------------------------------------------------------ |
+| 청 (cheong) — blue / green | East      | `secondary-*` (celadon 翡色), `indigo-*` (靑)                          | `bg-secondary-600`, `text-indigo-700` | Two flavors: celadon for vessels & nature, indigo for hanbok & sky                         |
+| 황 (hwang) — yellow        | Center    | `gold-*` (黃金)                                                        | `bg-gold-500`, `text-gold-700`        | Sunlit ochre. Anchors emperor / center of compass                                          |
+| 적 (jeok) — red            | South     | `coral-*` (朱), `oxblood-*` (낙관 인주), `primary-*` (terracotta 적토) | `bg-coral-500`, `text-oxblood-700`    | Three flavors: coral for highlights, oxblood for seal ink, terracotta for primary surfaces |
+| 백 (baek) — white          | West      | `white`, parchment surfaces                                            | `bg-white`, `bg-era-base` (Heritage)  | Heritage paints with parchment; Neon inverts (white as accent FG)                          |
+| 흑 (heuk) — black          | North     | `black`, `gray-*`, sumi ink                                            | `bg-black`, `text-gray-900`           | Heritage's primary ink; Neon's foundation surface                                          |
+
+The five jade tones (`jade-*`) sit alongside celadon as a 청 variant —
+verdant rather than vessel-glaze. Use jade for nature / growth contexts and
+celadon for craft / heritage contexts.
+
+```tsx
+// Celadon card with terracotta accent — works in both eras
+<Card className="bg-secondary-50 border-secondary-200">
+  <h3 className="text-primary-800">고려청자</h3>
+  <p className="text-secondary-700">Goryeo celadon vessel</p>
+</Card>
+```
+
+---
+
+## Primary palette — Terracotta (적토)
+
+The `primary-*` group anchors the system's warm identity:
+
+| Token         | Hex       | Use case                               |
+| ------------- | --------- | -------------------------------------- |
+| `primary-50`  | `#FCF5EC` | Subtle wash background                 |
+| `primary-100` | `#F3E0C7` | Hover wash                             |
+| `primary-300` | `#D3A47A` | Disabled button text                   |
+| `primary-500` | `#A76A44` | Default brand fill                     |
+| `primary-600` | `#8A5030` | **Main** — branded buttons, focus ring |
+| `primary-700` | `#6C3D24` | Pressed state                          |
+| `primary-900` | `#361E11` | Text on light background               |
+
+**`primary-*` vs `accent-*`:** `primary-*` is era-static — terracotta in
+both Heritage and Neon. `accent-*` is era-driven — terracotta in Heritage,
+electric indigo in Neon. Use `primary-*` when the warm earth tone _is_ the
+identity (boardgame surfaces, cultural panels). Use `accent-*` when the
+brand color should _adapt_ to era (CTAs, focus rings, links).
+
+In practice, most CTAs should use `accent-*` so they read as confidently in
+Neon as in Heritage.
+
+---
+
+## Accent palette — CSS-variable driven
+
+The `accent-*` group is a family of CSS custom properties (`--accent-50`
+through `--accent-950`) that **swap per era**. Components use
+`bg-accent-600`, `text-accent-700`, `ring-accent-500` etc., and the era
+system flips the underlying values:
+
+| Step         | Heritage (terracotta)          | Neon (electric indigo)         |
+| ------------ | ------------------------------ | ------------------------------ |
+| `accent-50`  | `rgb(252 245 236)` (warm wash) | `rgb(240 246 255)` (cold wash) |
+| `accent-100` | `rgb(243 224 199)`             | `rgb(214 230 255)`             |
+| `accent-300` | `rgb(211 164 122)`             | `rgb(125 178 255)`             |
+| `accent-500` | `rgb(167 106 68)`              | `rgb(70 114 255)`              |
+| `accent-600` | `rgb(138 80 48)` — **main**    | `rgb(90 80 255)` — **main**    |
+| `accent-700` | `rgb(108 61 36)`               | `rgb(68 60 220)`               |
+| `accent-900` | `rgb(54 30 17)`                | `rgb(28 22 110)`               |
+
+Because the values are stored as space-separated `R G B` triplets, you can
+apply alpha freely:
+
+```tsx
+// Works in both eras — alpha applied at use site
+<div className="bg-accent-600/20 ring-accent-600/40">…</div>
+```
+
+---
+
+## Era-aware semantic tokens
+
+These are the slots components actually read. Each one has a Heritage
+physical value and a Neon physical value; the token name stays the same.
+
+### Surfaces
+
+```
+bg-era-base     → page / panel background
+bg-era-raised   → cards, popovers, modals (one elevation up)
+bg-era-sunken   → inputs, wells, recessed regions
+bg-era-overlay  → modal backdrop, tooltip backplate
+```
+
+### Ink (text)
+
+```
+text-era-primary → default body & heading
+text-era-muted   → captions, secondary text
+text-era-inverse → text painted on era-overlay or on filled accent
+```
+
+⚠️ `text-era-inverse` is **dark** in Neon (it inverts to the void surface
+color). It is correct for text on a _light_ surface within Neon (rare),
+not for text on `bg-accent-600`. See the Accessibility guide for the
+`text-white` invariant.
+
+### Edges (borders)
+
+```
+border-era-soft → default 1px divider
+border-era-hard → emphasized 1.5px stroke (modal frame)
+border-era-seal → 2px decorative seal/cartouche outline
+```
+
+### Shadows (elevation)
+
+```
+shadow-era-card    → default card lift
+shadow-era-modal   → modal / dialog elevation
+shadow-era-tooltip → tooltip / popover halo
+shadow-era-pressed → active / pressed inset
+```
+
+In Heritage these are paper-depth drops; in Neon they are dual-ring neon
+glows. The semantic role is identical — only the material differs.
+
+### Motion
+
+```
+duration-era-fast → 220ms (Heritage) ↔ 120ms (Neon)
+duration-era      → 380ms (Heritage) ↔ 220ms (Neon)
+duration-era-slow → 640ms (Heritage) ↔ 360ms (Neon)
+ease-era-brush    → brushstroke curve (Heritage) ↔ snap (Neon)
+ease-era-charge   → charge-up curve for emphasis
+```
+
+The intent: Heritage moves like ink absorbing into hanji — slow, settling.
+Neon moves like a circuit firing — short, decisive.
+
+### Typography
+
+```
+font-era-display       → Gowun Batang serif ↔ Orbitron geometric
+font-era-body          → Noto Serif KR ↔ IBM Plex Sans KR
+font-era-accent        → Cormorant Garamond ↔ Orbitron
+tracking-era-display   → -0.01em ↔ +0.08em
+tracking-era-body      →  0em    ↔ +0.01em
+```
+
+The eras also flip `--ui-text-transform`: `none` in Heritage,
+`uppercase` in Neon. Most components don't apply it directly; opt in by
+referencing `var(--ui-text-transform)` when you want labels to follow the
+era's UI convention.
+
+---
+
+## `--era-accent-strong` — the contrast escape hatch
+
+Most accent text-on-surface combinations work directly: `text-accent-700`
+on the era surface is fine in Heritage (terracotta on hanji = 7.6:1, AAA).
+In Neon, the same `text-accent-700` (`#443cdc`) on the void surface
+(`#0b0e18`) only clears 2.7:1 — failing WCAG AA.
+
+The `--era-accent-strong` token solves this:
+
+| Era      | Resolves to                       | Contrast on era surface |
+| -------- | --------------------------------- | ----------------------- |
+| Heritage | `accent-700` (`rgb(108 61 36)`)   | 7.6:1 — AAA             |
+| Neon     | `accent-300` (`rgb(125 178 255)`) | 8.96:1 — AAA            |
+
+It's the token to reach for when you have **active / selected text on a
+neutral background** that needs the brand color to feel emphasized — for
+example, the active tab label in `Tabs`, the selected item in
+`DropdownMenu`, the active link in a `Sidebar`.
+
+```tsx
+// ❌ Wrong — fails AA in Neon
+<span className="text-accent-700">Active tab</span>
+
+// ✅ Right — passes AA in both eras
+<span style={{ color: "rgb(var(--era-accent-strong))" }}>Active tab</span>
+```
+
+There is currently no shorthand Tailwind utility for this; the inline
+`rgb(var(--era-accent-strong))` (with optional `/ 0.6` alpha) is the
+canonical form. If usage proliferates, we'll bind it to a named utility.
+
+---
+
+## Spacing, radius, shadows
+
+These tokens are era-static — Heritage and Neon share the same scale.
+
+- **Spacing** — see `Foundations/Spacing & Radius`. Standard 4-pixel base
+  scale (`px-1` = 4px, `px-4` = 16px, etc.). Component-level radius tokens
+  live under `borderRadius.*`: `card`, `button`, `pill`, `input`,
+  `chat-bubble`, `seal`.
+- **Shadows** — see `Foundations/Shadows`. Both era-static (`shadow-sm`
+  through `shadow-2xl`) and era-aware (`shadow-era-card`,
+  `shadow-era-modal`, etc.) families exist. Reach for the era-aware family
+  whenever the component should adapt to era atmosphere.
+
+---
+
+## Animations
+
+See `Foundations/Animations` for the full library. Two rules apply:
+
+1. **Use era-aware durations and easings on era-adaptive components.**
+   `duration-era ease-era-brush` is the default. This makes the same
+   transition feel like a brushstroke in Heritage and a snap in Neon.
+2. **No opacity ramps in entry animations.** Axe captures mid-frame; an
+   element transitioning from `opacity: 0` to `opacity: 1` will read as a
+   contrast violation at intermediate frames. Use transform-only keyframes
+   (`translateY`, `scale`) gated on `motion-safe:`. The Accessibility guide
+   covers this in detail.
+
+---
+
+## Do / Don't
+
+### ✅ DO
+
+```tsx
+<div className="bg-era-base text-era-primary border-era-soft">
+  <h2 className="font-era-display text-heading-2">제목</h2>
+  <p className="font-era-body">본문</p>
+  <button className="bg-accent-600 text-white shadow-era-card">Action</button>
+</div>
+```
+
+- `bg-era-base` adapts surface per era
+- `text-era-primary` adapts ink per era
+- `font-era-display` / `font-era-body` switch typeface per era
+- `bg-accent-600` adapts brand color per era
+- `text-white` is correct on filled accent in _both_ eras (see a11y)
+- `shadow-era-card` swaps from paper depth to neon glow
+
+### ❌ DON'T
+
+```tsx
+{
+  /* Hardcoded hex — won't adapt to Neon */
+}
+<div className="bg-[#fbf5e8] text-[#2b1d10]">…</div>;
+
+{
+  /* Inline style hex — same problem, harder to grep */
+}
+<div style={{ background: "#fbf5e8", color: "#000" }}>…</div>;
+
+{
+  /* Wrong inverse — text-era-inverse is dark in Neon, fails on filled accent */
+}
+<button className="bg-accent-600 text-era-inverse">Action</button>;
+
+{
+  /* Stale duration — won't sync with era pacing */
+}
+<div className="transition-colors duration-300">…</div>;
+```
+
+The exception is documented one-off cases where a token genuinely doesn't
+exist (e.g., a third-party brand color in a logo). In those cases, ask the
+user whether to add a token or hardcode — never silently hardcode.
+
+---
+
+## Migration tips — swapping raw hex for tokens
+
+When you inherit code with raw hex values, the migration is mechanical:
+
+| Raw value                                 | Token replacement                     | Notes                                                                                                   |
+| ----------------------------------------- | ------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| `#fbf5e8`                                 | `bg-era-raised`                       | Heritage parchment. Will become glass in Neon.                                                          |
+| `#f6efe1`                                 | `bg-era-base`                         | Heritage hanji. Becomes void in Neon.                                                                   |
+| `#2b1d10`                                 | `text-era-primary`                    | Heritage sumi ink. Becomes neon white in Neon.                                                          |
+| `#8A5030`                                 | `bg-primary-600` _or_ `bg-accent-600` | Pick `primary-*` if it should stay terracotta in Neon, `accent-*` if it should flip to electric indigo. |
+| `rgba(43,29,16,0.22)`                     | `border-era-soft`                     | Heritage soft edge. Becomes neon trace.                                                                 |
+| `0 6px 18px -10px rgba(60,40,20,0.35)`    | `shadow-era-card`                     | The full Heritage card shadow lives here.                                                               |
+| `Gowun Batang, ... serif`                 | `font-era-display`                    | The full stack lives in the era CSS variable.                                                           |
+| `380ms cubic-bezier(0.22, 0.61, 0.36, 1)` | `duration-era ease-era-brush`         | Both era-aware.                                                                                         |
+
+The procedure:
+
+1. Grep for raw hex in component files: `rg "#[0-9A-Fa-f]{6}" src/components/`.
+2. For each match, decide: era-static (use a fixed token) or era-adaptive
+   (use an `era-*` token).
+3. Replace, run `npm test`, run `npm run build:storybook`, switch the
+   Storybook era toolbar between Heritage and Neon, eyeball the result.
+4. If the visual breaks under one era, ask whether to (a) add a missing
+   `era-*` slot or (b) accept the static token.
+
+See also the Accessibility guide for the special cases (`text-white` on
+filled accent, `role="img"` for `<span aria-label>`, no opacity entries)
+that still apply after migration.
+
+---
+
+## Cross-reference
+
+- **`Foundations/Colors`** — every palette family with live swatches
+- **`Foundations/Typography`** — the type scale and font stacks
+- **`Foundations/Spacing & Radius`** — spatial scale and corner radii
+- **`Foundations/Shadows`** — both era-static and era-aware shadow tokens
+- **`Foundations/Animations`** — keyframe library and easing curves
+- **`Foundations/CSS Variables`** — runtime variable dump (most useful with
+  the Era toolbar set to Heritage or Neon)
+- **`Foundations/Era`** — the era contract and `applyEra()` API
+- **`Foundations/Accessibility`** — invariants every token user must respect

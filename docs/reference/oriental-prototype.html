@@ -1,0 +1,642 @@
+<!doctype html>
+<html lang="ko" data-era="heritage">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Oriental DS · 45-Component Era Showcase</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,700;1,500&family=Gowun+Batang:wght@400;700&family=IBM+Plex+Sans+KR:wght@300;400;500;700&family=Noto+Serif+KR:wght@400;500;700&family=Orbitron:wght@500;700;900&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  color-scheme: light;
+  --font-heritage-display: "Gowun Batang","Cormorant Garamond","AppleMyungjo","Hoefler Text","Didot","Apple SD Gothic Neo",serif;
+  --font-heritage-body:    "Noto Serif KR","Gowun Batang","AppleMyungjo","Georgia","Apple SD Gothic Neo",serif;
+  --font-heritage-latin:   "Cormorant Garamond","Hoefler Text","Didot","Times New Roman",serif;
+  --font-neon-display:     "Orbitron","Avenir Next Condensed","Futura","Helvetica Neue","Arial Narrow","Apple SD Gothic Neo",sans-serif;
+  --font-neon-body:        "IBM Plex Sans KR","Pretendard","Apple SD Gothic Neo","Helvetica Neue","SF Pro Text",sans-serif;
+  --font-mono:             "JetBrains Mono","SF Mono","Menlo",monospace;
+
+  --pattern-woodgrain:
+    repeating-linear-gradient(90deg, rgba(110,72,38,0.10) 0, rgba(110,72,38,0.10) 1px, transparent 1px, transparent 5px),
+    radial-gradient(ellipse at 20% 30%, rgba(120,80,40,0.22), transparent 60%),
+    radial-gradient(ellipse at 80% 70%, rgba(140,95,50,0.18), transparent 60%);
+  --pattern-porcelain:
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120'><g fill='none' stroke='rgba(43,29,16,0.22)' stroke-width='1'><circle cx='60' cy='60' r='40'/><circle cx='60' cy='60' r='28'/><path d='M60 20 Q85 45 60 60 Q35 75 60 100'/><path d='M20 60 Q45 35 60 60 Q75 85 100 60'/><circle cx='60' cy='60' r='4' fill='rgba(43,29,16,0.22)'/></g></svg>");
+  --pattern-hanji:
+    radial-gradient(circle at 30% 20%, rgba(90,60,30,0.06), transparent 40%),
+    radial-gradient(circle at 70% 75%, rgba(120,80,40,0.08), transparent 50%),
+    repeating-radial-gradient(circle at 50% 50%, rgba(140,110,70,0.04) 0 1px, transparent 1px 3px);
+  --pattern-circuit:
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='80' height='80'><g fill='none' stroke='rgba(140,170,255,0.22)' stroke-width='0.8'><path d='M0 20 H30 V0 M50 0 V30 H80 M0 60 H30 V80 M50 80 V60 H80'/><circle cx='30' cy='20' r='1.8' fill='rgba(140,170,255,0.5)'/><circle cx='50' cy='60' r='1.8' fill='rgba(140,170,255,0.5)'/></g></svg>");
+  --pattern-scanline:
+    repeating-linear-gradient(0deg, rgba(140,170,255,0.06) 0 1px, transparent 1px 3px);
+}
+html[data-era="heritage"] {
+  --accent-50:  252 245 236; --accent-100: 243 224 199;
+  --accent-300: 211 164 122; --accent-500: 167 106 68;
+  --accent-600: 138 80 48;   --accent-700: 108 61 36;
+  --era-surface-base: #f4ecdb; --era-surface-raised: #fbf5e8;
+  --era-surface-sunken: #e6d9bb; --era-surface-overlay: rgba(44,30,17,0.55);
+  --era-material-grain: var(--pattern-woodgrain);
+  --era-material-pattern: var(--pattern-porcelain);
+  --era-material-paper: var(--pattern-hanji);
+  --era-ink-primary: #2b1d10; --era-ink-muted: #6e5a3f;
+  --era-ink-inverse: #fbf5e8;
+  --era-edge-soft: rgba(43,29,16,0.22); --era-edge-hard: rgba(43,29,16,0.6);
+  --era-edge-seal: #7a2d1a;
+  --era-shadow-card: 0 1px 0 rgba(78,56,30,0.12), 0 6px 18px -10px rgba(60,40,20,0.35);
+  --era-shadow-modal: 0 20px 50px -14px rgba(60,40,20,0.5);
+  --era-ease-brush: cubic-bezier(0.22,0.61,0.36,1);
+  --era-dur-fast: 220ms; --era-dur-normal: 380ms; --era-dur-slow: 640ms;
+  --era-success: #4f7a3c; --era-warning: #c88d2b;
+  --era-error: #a3341f;   --era-info: #2d5a7a;
+  --font-display: var(--font-heritage-display);
+  --font-body: var(--font-heritage-body);
+  --font-accent: var(--font-heritage-latin);
+  --display-letter-spacing: -0.01em;
+  --display-weight: 700;
+  --body-line-height: 1.7;
+  --ui-tt: none;
+}
+html[data-era="neon"] {
+  --accent-50: 240 246 255; --accent-100: 214 230 255;
+  --accent-300: 125 178 255; --accent-500: 90 114 255;
+  --accent-600: 108 98 255; --accent-700: 74 66 220;
+  --era-surface-base: #0a0d1a; --era-surface-raised: rgba(255,255,255,0.05);
+  --era-surface-sunken: #05060e; --era-surface-overlay: rgba(4,8,22,0.6);
+  --era-material-grain: none;
+  --era-material-pattern: var(--pattern-circuit);
+  --era-material-paper: var(--pattern-scanline);
+  --era-ink-primary: #e8ecff; --era-ink-muted: rgba(232,236,255,0.6);
+  --era-ink-inverse: #0a0d1a;
+  --era-edge-soft: rgba(140,170,255,0.3);
+  --era-edge-hard: rgba(140,170,255,0.7);
+  --era-edge-seal: #58f7ff;
+  --era-shadow-card: 0 0 0 1px rgba(140,170,255,0.22), 0 10px 32px -12px rgba(108,98,255,0.55);
+  --era-shadow-modal: 0 0 0 1px rgba(140,170,255,0.3), 0 30px 80px -20px rgba(108,98,255,0.7);
+  --era-ease-brush: cubic-bezier(0.2,0,0,1);
+  --era-dur-fast: 120ms; --era-dur-normal: 220ms; --era-dur-slow: 360ms;
+  --era-success: #32e0a1; --era-warning: #ffc044;
+  --era-error: #ff5268;   --era-info: #58bbff;
+  --font-display: var(--font-neon-display);
+  --font-body: var(--font-neon-body);
+  --font-accent: var(--font-neon-display);
+  --display-letter-spacing: 0.08em;
+  --display-weight: 900;
+  --body-line-height: 1.55;
+  --ui-tt: uppercase;
+}
+*, *::before, *::after { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+  min-height: 100vh; color: var(--era-ink-primary);
+  background: var(--era-material-paper), var(--era-material-grain), var(--era-surface-base);
+  background-blend-mode: multiply, normal, normal;
+  font-family: var(--font-body); font-size: 14px; line-height: var(--body-line-height);
+  transition: background-color var(--era-dur-slow) var(--era-ease-brush), color var(--era-dur-slow) var(--era-ease-brush);
+}
+h1,h2,h3,h4 { font-family: var(--font-display); font-weight: var(--display-weight); letter-spacing: var(--display-letter-spacing); margin: 0; }
+code { font-family: var(--font-mono); font-size: 0.88em; }
+.app { display: grid; grid-template-columns: 240px 1fr; min-height: 100vh; }
+.sidebar { position: sticky; top: 0; align-self: start; height: 100vh; overflow-y: auto; padding: 20px 14px; background: var(--era-surface-raised); backdrop-filter: blur(10px); border-right: 1px solid var(--era-edge-soft); }
+.sidebar h3 { font-size: 11px; color: var(--era-ink-muted); text-transform: uppercase; letter-spacing: 0.14em; margin: 14px 8px 6px; font-weight: 700; }
+.sidebar a { display: block; padding: 6px 10px; border-radius: 8px; color: var(--era-ink-primary); text-decoration: none; font-size: 13px; transition: background var(--era-dur-fast); }
+.sidebar a:hover { background: rgba(var(--accent-500),0.1); }
+.content { padding: 28px 32px 120px; max-width: 1080px; }
+@media (max-width: 860px) { .app { grid-template-columns: 1fr; } .sidebar { display: none; } }
+.era-switch { position: sticky; top: 12px; z-index: 50; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 12px 16px; margin-bottom: 28px; background: var(--era-surface-raised); backdrop-filter: blur(10px); border: 1px solid var(--era-edge-soft); border-radius: 14px; box-shadow: var(--era-shadow-card); }
+.era-switch .brand { display: flex; align-items: center; gap: 10px; font-family: var(--font-display); font-weight: var(--display-weight); letter-spacing: var(--display-letter-spacing); font-size: 14px; text-transform: var(--ui-tt); }
+.era-switch .brand .dot { width: 10px; height: 10px; border-radius: 50%; background: rgb(var(--accent-600)); box-shadow: 0 0 0 3px rgba(var(--accent-600),0.25); }
+.toggle { display: inline-flex; padding: 4px; background: var(--era-surface-sunken); border: 1px solid var(--era-edge-soft); border-radius: 999px; }
+.toggle button { appearance: none; border: 0; cursor: pointer; padding: 8px 16px; border-radius: 999px; font: inherit; font-size: 12px; font-weight: 700; font-family: var(--font-display); letter-spacing: var(--display-letter-spacing); text-transform: var(--ui-tt); color: var(--era-ink-muted); background: transparent; transition: all var(--era-dur-normal) var(--era-ease-brush); }
+.toggle button.active { color: var(--era-ink-inverse); background: rgb(var(--accent-600)); }
+html[data-era="neon"] .toggle button.active { box-shadow: 0 0 0 1px rgba(var(--accent-600),0.8), 0 0 20px rgba(var(--accent-500),0.6); text-shadow: 0 0 8px rgba(255,255,255,0.6); }
+.cat { margin: 40px 0 18px; padding-bottom: 10px; border-bottom: 1px solid var(--era-edge-soft); }
+.cat h2 { font-size: 12px; text-transform: uppercase; letter-spacing: 0.24em; color: rgb(var(--accent-700)); }
+html[data-era="neon"] .cat h2 { text-shadow: 0 0 12px rgba(var(--accent-300),0.5); }
+.demo { margin-bottom: 22px; background: var(--era-surface-raised); border: 1px solid var(--era-edge-soft); border-radius: 14px; box-shadow: var(--era-shadow-card); overflow: hidden; }
+.demo-header { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 14px 18px; border-bottom: 1px solid var(--era-edge-soft); background: var(--era-surface-sunken); }
+.demo-header h3 { font-size: 15px; font-weight: 700; text-transform: var(--ui-tt); letter-spacing: var(--display-letter-spacing); }
+html[data-era="neon"] .demo-header h3 { letter-spacing: 0.12em; font-size: 13px; }
+.demo-header .sub { font-family: var(--font-mono); font-size: 11px; color: var(--era-ink-muted); }
+.demo-body { padding: 20px; display: flex; flex-wrap: wrap; gap: 14px; align-items: flex-start; }
+.demo-body.stack-v { flex-direction: column; align-items: stretch; }
+.type-h1 { font-family: var(--font-display); font-size: 40px; line-height: 1.1; font-weight: var(--display-weight); letter-spacing: var(--display-letter-spacing); }
+.type-h2 { font-family: var(--font-display); font-size: 28px; line-height: 1.2; font-weight: var(--display-weight); letter-spacing: var(--display-letter-spacing); }
+.type-h3 { font-family: var(--font-display); font-size: 20px; line-height: 1.3; font-weight: var(--display-weight); letter-spacing: var(--display-letter-spacing); }
+.type-body { font-family: var(--font-body); font-size: 15px; line-height: var(--body-line-height); }
+.type-small { font-size: 12px; color: var(--era-ink-muted); }
+.type-accent { font-family: var(--font-accent); font-style: italic; font-size: 18px; color: rgb(var(--accent-700)); }
+html[data-era="neon"] .type-accent { font-style: normal; text-transform: uppercase; letter-spacing: 0.22em; font-size: 13px; color: rgb(var(--accent-300)); }
+html[data-era="neon"] .type-h1, html[data-era="neon"] .type-h2 { text-transform: uppercase; letter-spacing: 0.1em; text-shadow: 0 0 18px rgba(var(--accent-500),0.4); }
+.stack-box { padding: 12px 16px; border-radius: 8px; background: var(--era-surface-sunken); border: 1px solid var(--era-edge-soft); font-size: 13px; }
+hr.sep { border: 0; height: 1px; background: var(--era-edge-soft); margin: 0; width: 100%; }
+html[data-era="heritage"] hr.sep { background: linear-gradient(90deg, transparent, rgba(43,29,16,0.4), transparent); }
+html[data-era="neon"] hr.sep { background: linear-gradient(90deg, transparent, rgba(140,170,255,0.7), transparent); box-shadow: 0 0 8px rgba(140,170,255,0.5); }
+.vsep { width: 1px; height: 40px; background: var(--era-edge-soft); }
+.btn { appearance: none; border: 0; cursor: pointer; padding: 10px 18px; border-radius: 10px; font-family: var(--font-display); font-size: 13px; font-weight: 700; letter-spacing: var(--display-letter-spacing); text-transform: var(--ui-tt); transition: all var(--era-dur-normal) var(--era-ease-brush); }
+.btn.sm { padding: 6px 12px; font-size: 12px; }
+.btn.lg { padding: 12px 22px; font-size: 15px; }
+.btn.primary { color: var(--era-ink-inverse); background: rgb(var(--accent-600)); box-shadow: var(--era-shadow-card); }
+.btn.primary:hover { background: rgb(var(--accent-700)); transform: translateY(-1px); }
+html[data-era="neon"] .btn.primary:hover { box-shadow: 0 0 0 1px rgba(var(--accent-500),0.8), 0 0 20px rgba(var(--accent-500),0.7); text-shadow: 0 0 8px rgba(255,255,255,0.7); }
+.btn.ghost { background: transparent; color: var(--era-ink-primary); border: 1px solid var(--era-edge-soft); }
+.btn.ghost:hover { background: rgba(var(--accent-500),0.08); border-color: var(--era-edge-hard); }
+.btn.seal { color: var(--era-edge-seal); background: transparent; border: 2px solid var(--era-edge-seal); letter-spacing: 0.15em; font-weight: 900; }
+.btn.danger { color: #fff; background: var(--era-error); }
+.btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.field { display: flex; flex-direction: column; gap: 6px; min-width: 200px; }
+.label { font-size: 12px; font-weight: 600; color: var(--era-ink-muted); text-transform: var(--ui-tt); letter-spacing: 0.04em; }
+.input, .select { background: var(--era-surface-sunken); border: 1px solid var(--era-edge-soft); color: var(--era-ink-primary); padding: 8px 12px; border-radius: 8px; font: inherit; font-size: 13px; transition: all var(--era-dur-normal) var(--era-ease-brush); }
+.input:focus, .select:focus { outline: 0; border-color: rgb(var(--accent-600)); box-shadow: 0 0 0 3px rgba(var(--accent-500),0.2); }
+html[data-era="neon"] .input:focus, html[data-era="neon"] .select:focus { box-shadow: 0 0 0 1px rgb(var(--accent-500)), 0 0 14px rgba(var(--accent-500),0.5); }
+.help { font-size: 11px; color: var(--era-ink-muted); }
+.help.err { color: var(--era-error); }
+.check, .radio { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer; }
+.check input, .radio input { display: none; }
+.check .box, .radio .dot { width: 18px; height: 18px; background: var(--era-surface-sunken); border: 1.5px solid var(--era-edge-hard); position: relative; }
+.check .box { border-radius: 4px; } .radio .dot { border-radius: 50%; }
+.check input:checked + .box { background: rgb(var(--accent-600)); border-color: rgb(var(--accent-700)); }
+.check input:checked + .box::after { content: ""; position: absolute; left: 4px; top: 1px; width: 6px; height: 10px; border: solid var(--era-ink-inverse); border-width: 0 2px 2px 0; transform: rotate(45deg); }
+.radio input:checked + .dot { background: radial-gradient(circle, rgb(var(--accent-600)) 35%, var(--era-surface-sunken) 45%); border-color: rgb(var(--accent-700)); }
+html[data-era="neon"] .check input:checked + .box, html[data-era="neon"] .radio input:checked + .dot { box-shadow: 0 0 10px rgba(var(--accent-500),0.7); }
+.switch { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; font-size: 13px; }
+.switch input { display: none; }
+.switch .track { width: 40px; height: 22px; border-radius: 999px; background: var(--era-surface-sunken); border: 1px solid var(--era-edge-soft); position: relative; transition: background var(--era-dur-normal); }
+.switch .track::before { content: ""; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: var(--era-ink-primary); transition: transform var(--era-dur-normal) var(--era-ease-brush); }
+.switch input:checked + .track { background: rgb(var(--accent-600)); }
+.switch input:checked + .track::before { transform: translateX(18px); background: var(--era-ink-inverse); }
+html[data-era="neon"] .switch input:checked + .track { box-shadow: 0 0 12px rgba(var(--accent-500),0.6); }
+.card { padding: 18px; border-radius: 12px; min-width: 220px; background: var(--era-surface-raised); border: 1px solid var(--era-edge-soft); box-shadow: var(--era-shadow-card); transition: transform var(--era-dur-normal); }
+.card:hover { transform: translateY(-2px); }
+.card-title { font-family: var(--font-display); font-weight: 700; font-size: 15px; margin: 0 0 4px; text-transform: var(--ui-tt); }
+.card-body { font-size: 13px; color: var(--era-ink-muted); margin: 0; }
+.badge { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 999px; font-family: var(--font-body); font-size: 11px; font-weight: 600; background: rgba(var(--accent-500),0.12); color: rgb(var(--accent-700)); border: 1px solid rgba(var(--accent-500),0.3); text-transform: var(--ui-tt); letter-spacing: 0.04em; }
+html[data-era="neon"] .badge { font-family: var(--font-display); letter-spacing: 0.1em; color: rgb(var(--accent-300)); border-color: rgba(var(--accent-300),0.5); text-shadow: 0 0 8px rgba(var(--accent-300),0.6); }
+.badge.success { color: var(--era-success); border-color: var(--era-success); background: transparent; }
+.badge.warning { color: var(--era-warning); border-color: var(--era-warning); background: transparent; }
+.badge.error { color: var(--era-error); border-color: var(--era-error); background: transparent; }
+.avatar { display: inline-grid; place-items: center; width: 40px; height: 40px; border-radius: 50%; background: var(--era-surface-sunken); border: 2px solid var(--era-edge-soft); font-family: var(--font-display); font-weight: 700; font-size: 14px; color: rgb(var(--accent-700)); }
+.avatar.sm { width: 28px; height: 28px; font-size: 11px; }
+.avatar.lg { width: 56px; height: 56px; font-size: 18px; }
+html[data-era="neon"] .avatar { box-shadow: 0 0 10px rgba(var(--accent-500),0.3); color: rgb(var(--accent-300)); }
+.tag { display: inline-flex; align-items: center; gap: 6px; padding: 4px 8px; border-radius: 6px; background: rgba(var(--accent-500),0.08); border: 1px solid rgba(var(--accent-500),0.25); color: rgb(var(--accent-700)); font-size: 12px; }
+.tag .x { cursor: pointer; opacity: 0.6; }
+.cover { position: relative; width: 260px; height: 140px; border-radius: 10px; overflow: hidden; background: var(--era-material-pattern), var(--era-surface-sunken); background-size: 80px 80px; border: 1px solid var(--era-edge-soft); }
+.cover::after { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, transparent 40%, rgba(0,0,0,0.6)); }
+.cover .cover-label { position: absolute; left: 12px; bottom: 10px; z-index: 1; color: #fff; font-family: var(--font-display); font-weight: 700; font-size: 15px; text-transform: var(--ui-tt); }
+.icon-grid { display: grid; grid-template-columns: repeat(8, 1fr); gap: 6px; width: 100%; max-width: 340px; }
+.icon-cell { aspect-ratio: 1; display: grid; place-items: center; border-radius: 8px; cursor: pointer; font-size: 18px; background: var(--era-surface-sunken); border: 1px solid var(--era-edge-soft); transition: all var(--era-dur-fast); }
+.icon-cell:hover { border-color: rgb(var(--accent-600)); transform: scale(1.08); }
+.icon-cell.active { background: rgb(var(--accent-600)); color: var(--era-ink-inverse); }
+.alert { display: flex; align-items: flex-start; gap: 12px; padding: 14px 16px; border-radius: 10px; border-left: 3px solid rgb(var(--accent-600)); background: rgba(var(--accent-500),0.08); min-width: 300px; }
+.alert.success { border-color: var(--era-success); }
+.alert.warning { border-color: var(--era-warning); }
+.alert.error { border-color: var(--era-error); }
+.alert .alert-title { font-family: var(--font-display); font-weight: 700; font-size: 13px; text-transform: var(--ui-tt); }
+.alert .alert-msg { font-size: 12px; color: var(--era-ink-muted); }
+.toast { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-radius: 10px; background: var(--era-surface-raised); border: 1px solid var(--era-edge-soft); box-shadow: var(--era-shadow-modal); min-width: 240px; font-size: 13px; }
+.tooltip-wrap { position: relative; display: inline-block; }
+.tooltip { position: absolute; bottom: calc(100% + 8px); left: 50%; transform: translateX(-50%); background: var(--era-ink-primary); color: var(--era-ink-inverse); padding: 6px 10px; border-radius: 6px; font-size: 11px; white-space: nowrap; }
+.spinner { width: 28px; height: 28px; border-radius: 50%; border: 3px solid var(--era-edge-soft); border-top-color: rgb(var(--accent-600)); animation: spin 1s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.dots { display: inline-flex; gap: 6px; }
+.dots span { width: 8px; height: 8px; border-radius: 50%; background: rgb(var(--accent-600)); animation: dotp 1.2s ease-in-out infinite; }
+.dots span:nth-child(2) { animation-delay: 0.2s; } .dots span:nth-child(3) { animation-delay: 0.4s; }
+@keyframes dotp { 0%,100% { opacity: 0.3; transform: scale(0.8); } 50% { opacity: 1; transform: scale(1.1); } }
+.skeleton { height: 12px; border-radius: 6px; background: linear-gradient(90deg, var(--era-surface-sunken), rgba(var(--accent-500),0.12), var(--era-surface-sunken)); background-size: 200% 100%; animation: shimmer 1.6s ease-in-out infinite; width: 100%; }
+.skeleton.line { height: 10px; margin-bottom: 8px; }
+.skeleton.avatar { width: 40px; height: 40px; border-radius: 50%; flex-shrink: 0; }
+@keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
+.progress-bar { height: 10px; border-radius: 999px; background: var(--era-surface-sunken); border: 1px solid var(--era-edge-soft); overflow: hidden; width: 220px; }
+.progress-bar .bar { height: 100%; background: linear-gradient(90deg, rgb(var(--accent-500)), rgb(var(--accent-700))); }
+html[data-era="neon"] .progress-bar .bar { box-shadow: 0 0 12px rgba(var(--accent-500),0.6); }
+.progress-ring { position: relative; width: 56px; height: 56px; }
+.progress-ring svg { transform: rotate(-90deg); }
+.progress-ring .ring-bg { fill: none; stroke: var(--era-edge-soft); stroke-width: 6; }
+.progress-ring .ring-fg { fill: none; stroke: rgb(var(--accent-600)); stroke-width: 6; stroke-linecap: round; }
+html[data-era="neon"] .progress-ring .ring-fg { filter: drop-shadow(0 0 4px rgba(var(--accent-500),0.8)); }
+.progress-ring .ring-label { position: absolute; inset: 0; display: grid; place-items: center; font-family: var(--font-display); font-size: 12px; font-weight: 700; }
+.empty { width: 100%; max-width: 440px; margin: 0 auto; padding: 30px 20px; text-align: center; border: 1px dashed var(--era-edge-soft); border-radius: 12px; }
+.empty h4 { font-family: var(--font-display); font-size: 14px; margin: 0 0 4px; text-transform: var(--ui-tt); }
+.empty p { font-size: 12px; color: var(--era-ink-muted); margin: 0 0 12px; }
+.sync { display: inline-flex; align-items: center; gap: 8px; padding: 4px 12px; border-radius: 999px; background: var(--era-surface-sunken); border: 1px solid var(--era-edge-soft); font-size: 12px; }
+.sync .ind { width: 8px; height: 8px; border-radius: 50%; background: var(--era-success); animation: pulse 2s ease-in-out infinite; }
+.sync.syncing .ind { background: var(--era-warning); } .sync.offline .ind { background: var(--era-error); animation: none; }
+@keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
+.bread { display: flex; align-items: center; gap: 6px; font-size: 13px; flex-wrap: wrap; }
+.bread a { color: var(--era-ink-muted); text-decoration: none; }
+.bread .sep-s { color: var(--era-ink-muted); opacity: 0.5; }
+.bread .current { color: var(--era-ink-primary); font-weight: 600; }
+.tabs { display: flex; border-bottom: 1px solid var(--era-edge-soft); width: 100%; }
+.tabs button { appearance: none; border: 0; background: transparent; cursor: pointer; padding: 10px 14px; font-family: var(--font-display); font-size: 13px; font-weight: 600; text-transform: var(--ui-tt); letter-spacing: 0.04em; color: var(--era-ink-muted); border-bottom: 2px solid transparent; margin-bottom: -1px; }
+.tabs button.active { color: rgb(var(--accent-700)); border-color: rgb(var(--accent-600)); }
+html[data-era="neon"] .tabs button.active { text-shadow: 0 0 8px rgba(var(--accent-300),0.6); }
+.tab-content { padding: 16px 0 0; width: 100%; font-size: 13px; color: var(--era-ink-muted); }
+.pag { display: flex; align-items: center; gap: 4px; }
+.pag button { appearance: none; border: 1px solid var(--era-edge-soft); background: var(--era-surface-raised); padding: 6px 11px; border-radius: 6px; cursor: pointer; font: inherit; font-size: 12px; font-weight: 600; color: var(--era-ink-primary); min-width: 32px; }
+.pag button.active { background: rgb(var(--accent-600)); color: var(--era-ink-inverse); border-color: rgb(var(--accent-700)); }
+.pag button:disabled { opacity: 0.35; }
+.sb-demo { width: 240px; padding: 12px; background: var(--era-surface-sunken); border: 1px solid var(--era-edge-soft); border-radius: 10px; }
+.sb-demo .sbh { font-size: 11px; color: var(--era-ink-muted); text-transform: uppercase; letter-spacing: 0.12em; margin: 6px 8px; font-weight: 700; }
+.sb-demo .sbi { display: flex; align-items: center; gap: 8px; padding: 7px 10px; border-radius: 6px; font-size: 13px; cursor: pointer; }
+.sb-demo .sbi.active { background: rgb(var(--accent-600)); color: var(--era-ink-inverse); }
+.tree { font-size: 13px; width: 280px; }
+.tree .node { padding: 4px 8px; border-radius: 4px; cursor: pointer; display: flex; align-items: center; gap: 6px; }
+.tree .caret { width: 10px; display: inline-block; transition: transform var(--era-dur-fast); }
+.tree .caret.open { transform: rotate(90deg); }
+.tree .children { padding-left: 18px; display: none; } .tree .children.open { display: block; }
+.stepper { display: flex; align-items: center; width: 100%; max-width: 500px; }
+.stepper .st { display: flex; flex-direction: column; align-items: center; gap: 6px; min-width: 72px; }
+.stepper .circle { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; background: var(--era-surface-sunken); border: 2px solid var(--era-edge-soft); font-family: var(--font-display); font-size: 12px; font-weight: 700; }
+.stepper .st.done .circle { background: rgb(var(--accent-600)); color: var(--era-ink-inverse); border-color: rgb(var(--accent-700)); }
+.stepper .st.current .circle { border-color: rgb(var(--accent-600)); color: rgb(var(--accent-700)); box-shadow: 0 0 0 3px rgba(var(--accent-500),0.2); }
+.stepper .lbl { font-size: 11px; color: var(--era-ink-muted); text-transform: var(--ui-tt); letter-spacing: 0.04em; }
+.stepper .line { flex: 1; height: 2px; background: var(--era-edge-soft); margin: 0 -6px; align-self: flex-start; margin-top: 13px; }
+.stepper .st.done + .line { background: rgb(var(--accent-600)); }
+.modal-backdrop { position: fixed; inset: 0; background: var(--era-surface-overlay); backdrop-filter: blur(4px); display: none; z-index: 100; align-items: center; justify-content: center; }
+.modal-backdrop.open { display: flex; }
+.modal-panel { width: 420px; max-width: 92vw; background: var(--era-surface-raised); border: 1px solid var(--era-edge-soft); border-radius: 14px; box-shadow: var(--era-shadow-modal); padding: 22px; }
+.modal-panel h4 { font-size: 16px; margin-bottom: 8px; text-transform: var(--ui-tt); }
+.modal-panel p { font-size: 13px; color: var(--era-ink-muted); margin: 0 0 18px; }
+.modal-foot { display: flex; justify-content: flex-end; gap: 8px; }
+.popover-wrap { position: relative; }
+.popover { position: absolute; top: calc(100% + 8px); left: 0; min-width: 200px; background: var(--era-surface-raised); border: 1px solid var(--era-edge-soft); border-radius: 10px; box-shadow: var(--era-shadow-modal); padding: 12px; font-size: 12px; color: var(--era-ink-muted); display: none; z-index: 10; }
+.popover-wrap.open .popover { display: block; }
+.menu { min-width: 200px; background: var(--era-surface-raised); border: 1px solid var(--era-edge-soft); border-radius: 10px; box-shadow: var(--era-shadow-card); padding: 6px; }
+.menu .mi { display: flex; align-items: center; gap: 8px; padding: 7px 10px; border-radius: 6px; font-size: 13px; cursor: pointer; }
+.menu .mi.danger { color: var(--era-error); }
+.menu hr { border: 0; height: 1px; background: var(--era-edge-soft); margin: 4px 0; }
+.cmdp { width: 100%; max-width: 460px; background: var(--era-surface-raised); border: 1px solid var(--era-edge-soft); border-radius: 12px; box-shadow: var(--era-shadow-modal); overflow: hidden; }
+.cmdp .cmd-input { width: 100%; background: transparent; border: 0; outline: 0; padding: 14px 16px; font: inherit; font-size: 14px; color: var(--era-ink-primary); border-bottom: 1px solid var(--era-edge-soft); }
+.cmdp .cmd-list { padding: 6px; max-height: 200px; overflow-y: auto; }
+.cmdp .cmd-item { display: flex; align-items: center; justify-content: space-between; padding: 8px 10px; border-radius: 6px; font-size: 13px; cursor: pointer; }
+.cmdp .cmd-item.selected { background: rgba(var(--accent-500),0.12); }
+.cmdp .kbd { font-family: var(--font-mono); font-size: 11px; color: var(--era-ink-muted); padding: 1px 6px; border: 1px solid var(--era-edge-soft); border-radius: 4px; }
+.table { width: 100%; border-collapse: collapse; font-size: 13px; border: 1px solid var(--era-edge-soft); border-radius: 10px; overflow: hidden; }
+.table th, .table td { padding: 10px 14px; text-align: left; border-bottom: 1px solid var(--era-edge-soft); }
+.table th { background: var(--era-surface-sunken); font-family: var(--font-display); font-weight: 700; font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--era-ink-muted); }
+.kan { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; width: 100%; }
+.kan-col { background: var(--era-surface-sunken); border: 1px solid var(--era-edge-soft); border-radius: 10px; padding: 10px; min-height: 180px; }
+.kan-col h5 { font-family: var(--font-display); font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--era-ink-muted); margin: 4px 4px 10px; }
+.kan-card { background: var(--era-surface-raised); border: 1px solid var(--era-edge-soft); border-radius: 8px; padding: 10px; margin-bottom: 6px; font-size: 12px; cursor: grab; box-shadow: var(--era-shadow-card); }
+.dnd { display: flex; flex-direction: column; gap: 6px; width: 280px; }
+.dnd-item { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-radius: 8px; background: var(--era-surface-raised); border: 1px solid var(--era-edge-soft); cursor: grab; font-size: 13px; }
+.cal { width: 280px; background: var(--era-surface-raised); border: 1px solid var(--era-edge-soft); border-radius: 10px; padding: 12px; }
+.cal-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+.cal-head h5 { font-family: var(--font-display); font-size: 14px; text-transform: var(--ui-tt); }
+.cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; font-size: 11px; text-align: center; }
+.cal-dow { padding: 6px 0; color: var(--era-ink-muted); font-weight: 600; font-size: 10px; text-transform: uppercase; }
+.cal-day { padding: 6px 0; border-radius: 6px; cursor: pointer; }
+.cal-day.today { color: rgb(var(--accent-700)); font-weight: 700; }
+.cal-day.selected { background: rgb(var(--accent-600)); color: var(--era-ink-inverse); font-weight: 700; }
+.cal-day.muted { color: var(--era-ink-muted); opacity: 0.4; }
+.acc { width: 100%; border: 1px solid var(--era-edge-soft); border-radius: 10px; overflow: hidden; }
+.acc-item { border-bottom: 1px solid var(--era-edge-soft); }
+.acc-item:last-child { border-bottom: 0; }
+.acc-head { width: 100%; padding: 12px 16px; background: transparent; border: 0; cursor: pointer; font: inherit; text-align: left; display: flex; justify-content: space-between; align-items: center; font-family: var(--font-display); font-weight: 700; font-size: 13px; text-transform: var(--ui-tt); color: var(--era-ink-primary); }
+.acc-head .chev { transition: transform var(--era-dur-normal); }
+.acc-item.open .acc-head .chev { transform: rotate(90deg); color: rgb(var(--accent-600)); }
+.acc-body { max-height: 0; overflow: hidden; transition: max-height var(--era-dur-normal); padding: 0 16px; font-size: 13px; color: var(--era-ink-muted); }
+.acc-item.open .acc-body { max-height: 200px; padding: 0 16px 14px; }
+.md { width: 100%; border: 1px solid var(--era-edge-soft); border-radius: 10px; overflow: hidden; }
+.md-tool { display: flex; gap: 4px; padding: 6px 8px; border-bottom: 1px solid var(--era-edge-soft); background: var(--era-surface-sunken); }
+.md-tool button { appearance: none; border: 0; background: transparent; cursor: pointer; padding: 4px 10px; font-family: var(--font-mono); font-size: 12px; font-weight: 700; color: var(--era-ink-muted); border-radius: 4px; }
+.md textarea { width: 100%; min-height: 100px; padding: 12px; background: var(--era-surface-raised); border: 0; font-family: var(--font-mono); font-size: 13px; color: var(--era-ink-primary); resize: vertical; outline: 0; }
+.rec { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-radius: 12px; background: var(--era-surface-sunken); border: 1px solid var(--era-edge-soft); min-width: 300px; }
+.rec-btn { width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; cursor: pointer; background: var(--era-error); color: #fff; border: 0; font-size: 18px; }
+.rec-btn.active { animation: pulse 1.2s ease-in-out infinite; }
+.rec-wave { flex: 1; display: flex; align-items: center; gap: 2px; height: 28px; }
+.rec-wave span { width: 3px; background: rgb(var(--accent-600)); border-radius: 2px; animation: wave 1s ease-in-out infinite; }
+@keyframes wave { 0%,100% { height: 6px; } 50% { height: 22px; } }
+.rec-time { font-family: var(--font-mono); font-size: 13px; font-weight: 600; }
+.prompt { display: flex; align-items: flex-end; gap: 8px; padding: 10px; background: var(--era-surface-raised); border: 1px solid var(--era-edge-soft); border-radius: 14px; box-shadow: var(--era-shadow-card); width: 100%; max-width: 520px; }
+.prompt textarea { flex: 1; background: transparent; border: 0; outline: 0; resize: none; font: inherit; font-size: 14px; color: var(--era-ink-primary); min-height: 22px; padding: 4px 8px; }
+.prompt .send { width: 34px; height: 34px; border-radius: 50%; border: 0; cursor: pointer; background: rgb(var(--accent-600)); color: var(--era-ink-inverse); display: grid; place-items: center; }
+.chat { display: flex; flex-direction: column; gap: 10px; width: 100%; max-width: 520px; }
+.bubble { max-width: 78%; padding: 10px 14px; border-radius: 14px; font-size: 14px; line-height: 1.5; }
+.bubble.me { align-self: flex-end; background: rgb(var(--accent-600)); color: var(--era-ink-inverse); border-bottom-right-radius: 4px; }
+.bubble.ai { align-self: flex-start; background: var(--era-surface-sunken); color: var(--era-ink-primary); border: 1px solid var(--era-edge-soft); border-bottom-left-radius: 4px; }
+@media (prefers-reduced-motion: reduce) { * { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; } }
+</style>
+</head>
+<body>
+<div class="app">
+<aside class="sidebar">
+  <h3>Foundation</h3><a href="#typography">Typography</a><a href="#stack">Stack</a><a href="#separator">Separator</a>
+  <h3>Actions</h3><a href="#button">Button</a>
+  <h3>Forms</h3><a href="#input">Input</a><a href="#textfield">TextField</a><a href="#checkbox">Checkbox</a><a href="#radio">Radio</a><a href="#switch">Switch</a><a href="#select">Select</a><a href="#filter">Filter</a>
+  <h3>Display</h3><a href="#card">Card</a><a href="#badge">Badge</a><a href="#avatar">Avatar</a><a href="#tag">Tag</a><a href="#coverimage">CoverImage</a><a href="#iconpicker">IconPicker</a>
+  <h3>Feedback</h3><a href="#alert">Alert</a><a href="#toast">Toast</a><a href="#tooltip">Tooltip</a><a href="#spinner">Spinner</a><a href="#loadingdots">LoadingDots</a><a href="#skeleton">Skeleton</a><a href="#progress">Progress</a><a href="#emptystate">EmptyState</a><a href="#syncstatus">SyncStatus</a>
+  <h3>Navigation</h3><a href="#breadcrumb">Breadcrumb</a><a href="#tabs">Tabs</a><a href="#pagination">Pagination</a><a href="#sidebar-cmp">Sidebar</a><a href="#pagetree">PageTree</a><a href="#stepper">Stepper</a>
+  <h3>Overlay</h3><a href="#modal">Modal</a><a href="#popover">Popover</a><a href="#dropdown">DropdownMenu</a><a href="#command">CommandPalette</a>
+  <h3>Data</h3><a href="#datatable">DataTable</a><a href="#kanban">KanbanBoard</a><a href="#dragdrop">DragDrop</a><a href="#calendar">Calendar</a><a href="#accordion">Accordion</a>
+  <h3>Editor · Media</h3><a href="#markdown">MarkdownEditor</a><a href="#audio">AudioRecorder</a>
+  <h3>Chat</h3><a href="#promptinput">PromptInput</a><a href="#chatbubble">ChatBubble</a>
+</aside>
+<main class="content">
+<div class="era-switch">
+  <div class="brand"><span class="dot"></span><span id="brandText">Oriental DS · 45 Components</span></div>
+  <div class="toggle"><button class="active" data-era="heritage">過 · Heritage</button><button data-era="neon">現 · Neon</button></div>
+</div>
+
+<div class="cat"><h2>Foundation</h2></div>
+<section id="typography" class="demo"><div class="demo-header"><h3>Typography</h3><span class="sub">Display · Body · Accent</span></div><div class="demo-body stack-v">
+  <div class="type-h1" id="tgH1">龍虎相搏</div><div class="type-h2" id="tgH2">과거의 결, 현재의 빛</div><div class="type-h3">Heading level three</div>
+  <div class="type-body">동방의 오랜 전설에서 용은 하늘을, 호랑이는 땅을 다스렸다.</div>
+  <div class="type-accent">— Heritage of the East, reforged in light.</div><div class="type-small">small · caption</div>
+</div></section>
+<section id="stack" class="demo"><div class="demo-header"><h3>Stack</h3><span class="sub">레이아웃 프리미티브</span></div><div class="demo-body">
+  <div style="display:flex; gap:8px"><div class="stack-box">item 1</div><div class="stack-box">item 2</div><div class="stack-box">item 3</div></div>
+  <div style="display:flex; flex-direction:column; gap:8px"><div class="stack-box">vertical 1</div><div class="stack-box">vertical 2</div></div>
+</div></section>
+<section id="separator" class="demo"><div class="demo-header"><h3>Separator</h3><span class="sub">horizontal · vertical</span></div><div class="demo-body stack-v">
+  <hr class="sep"><div style="display:flex; gap:12px; align-items:center; font-size:13px"><span>左</span><div class="vsep"></div><span>右</span><div class="vsep"></div><span>間</span></div>
+</div></section>
+
+<div class="cat"><h2>Actions</h2></div>
+<section id="button" class="demo"><div class="demo-header"><h3>Button</h3><span class="sub">primary · ghost · seal · danger · sizes</span></div><div class="demo-body stack-v">
+  <div style="display:flex; gap:8px; flex-wrap:wrap"><button class="btn primary">주 행동</button><button class="btn ghost">보조</button><button class="btn seal">印 낙관</button><button class="btn danger">삭제</button><button class="btn primary" disabled>비활성</button></div>
+  <div style="display:flex; gap:8px; flex-wrap:wrap"><button class="btn primary sm">Small</button><button class="btn primary">Medium</button><button class="btn primary lg">Large</button></div>
+</div></section>
+
+<div class="cat"><h2>Forms</h2></div>
+<section id="input" class="demo"><div class="demo-header"><h3>Input</h3><span class="sub">text · number · password</span></div><div class="demo-body">
+  <div class="field"><input class="input" placeholder="이름을 입력"></div>
+  <div class="field"><input class="input" type="number" placeholder="숫자"></div>
+  <div class="field"><input class="input" type="password" placeholder="비밀번호"></div>
+</div></section>
+<section id="textfield" class="demo"><div class="demo-header"><h3>TextField</h3><span class="sub">label · helper · error</span></div><div class="demo-body">
+  <div class="field"><label class="label">이름</label><input class="input" value="주영익"><span class="help">성을 제외하고 입력</span></div>
+  <div class="field"><label class="label">이메일</label><input class="input" value="cto@" style="border-color:var(--era-error)"><span class="help err">형식이 올바르지 않습니다</span></div>
+</div></section>
+<section id="checkbox" class="demo"><div class="demo-header"><h3>Checkbox</h3><span class="sub">checked · unchecked · disabled</span></div><div class="demo-body">
+  <label class="check"><input type="checkbox" checked><span class="box"></span>기본</label>
+  <label class="check"><input type="checkbox"><span class="box"></span>미체크</label>
+  <label class="check" style="opacity:0.4"><input type="checkbox" disabled><span class="box"></span>비활성</label>
+</div></section>
+<section id="radio" class="demo"><div class="demo-header"><h3>Radio</h3><span class="sub">option group</span></div><div class="demo-body">
+  <label class="radio"><input type="radio" name="r1" checked><span class="dot"></span>과거(過)</label>
+  <label class="radio"><input type="radio" name="r1"><span class="dot"></span>현대(現)</label>
+  <label class="radio"><input type="radio" name="r1"><span class="dot"></span>혼합(混)</label>
+</div></section>
+<section id="switch" class="demo"><div class="demo-header"><h3>Switch</h3><span class="sub">toggle on · off</span></div><div class="demo-body">
+  <label class="switch"><input type="checkbox" checked><span class="track"></span>알림</label>
+  <label class="switch"><input type="checkbox"><span class="track"></span>자동 저장</label>
+</div></section>
+<section id="select" class="demo"><div class="demo-header"><h3>Select</h3><span class="sub">dropdown</span></div><div class="demo-body">
+  <div class="field"><label class="label">난이도</label><select class="select"><option>入門 · Easy</option><option>中級 · Medium</option><option>上級 · Hard</option></select></div>
+</div></section>
+<section id="filter" class="demo"><div class="demo-header"><h3>Filter</h3><span class="sub">chip filters</span></div><div class="demo-body">
+  <span class="badge" style="cursor:pointer; background:rgb(var(--accent-600)); color:var(--era-ink-inverse); border-color:rgb(var(--accent-700))">전체 32</span>
+  <span class="badge" style="cursor:pointer">진행중 12</span><span class="badge" style="cursor:pointer">완료 20</span><span class="badge" style="cursor:pointer">보관 8</span>
+</div></section>
+
+<div class="cat"><h2>Display</h2></div>
+<section id="card" class="demo"><div class="demo-header"><h3>Card</h3><span class="sub">default · scroll/glass · interactive</span></div><div class="demo-body">
+  <div class="card"><h4 class="card-title">기본 카드</h4><p class="card-body">동일한 토큰으로 두 시대 표현.</p></div>
+  <div class="card" style="cursor:pointer"><h4 class="card-title">상호작용</h4><p class="card-body">hover 시 살짝 떠오릅니다.</p></div>
+</div></section>
+<section id="badge" class="demo"><div class="demo-header"><h3>Badge</h3><span class="sub">default · success · warning · error</span></div><div class="demo-body">
+  <span class="badge">기본</span><span class="badge success">성공</span><span class="badge warning">주의</span><span class="badge error">위험</span><span class="badge">v0.1.0</span>
+</div></section>
+<section id="avatar" class="demo"><div class="demo-header"><h3>Avatar</h3><span class="sub">initials · sizes · group</span></div><div class="demo-body">
+  <div class="avatar sm">金</div><div class="avatar">李</div><div class="avatar lg">朴</div>
+  <div style="display:flex"><div class="avatar sm" style="margin-right:-8px; z-index:3">J</div><div class="avatar sm" style="margin-right:-8px; z-index:2">Y</div><div class="avatar sm" style="background:rgb(var(--accent-600)); color:var(--era-ink-inverse)">+4</div></div>
+</div></section>
+<section id="tag" class="demo"><div class="demo-header"><h3>Tag</h3><span class="sub">removable</span></div><div class="demo-body">
+  <span class="tag">전략 <span class="x">×</span></span><span class="tag">보드게임 <span class="x">×</span></span><span class="tag">동양풍 <span class="x">×</span></span>
+</div></section>
+<section id="coverimage" class="demo"><div class="demo-header"><h3>CoverImage</h3><span class="sub">pattern overlay</span></div><div class="demo-body">
+  <div class="cover"><span class="cover-label">龍의 영역</span></div>
+  <div class="cover" style="background:linear-gradient(135deg, rgba(var(--accent-500),0.35), rgba(var(--accent-700),0.5)), var(--era-material-pattern); background-size: cover, 80px 80px"><span class="cover-label">虎의 영역</span></div>
+</div></section>
+<section id="iconpicker" class="demo"><div class="demo-header"><h3>IconPicker</h3><span class="sub">grid selector</span></div><div class="demo-body">
+  <div class="icon-grid" id="iconGrid">
+    <div class="icon-cell active">龍</div><div class="icon-cell">虎</div><div class="icon-cell">鳳</div><div class="icon-cell">龜</div>
+    <div class="icon-cell">天</div><div class="icon-cell">地</div><div class="icon-cell">水</div><div class="icon-cell">火</div>
+    <div class="icon-cell">金</div><div class="icon-cell">木</div><div class="icon-cell">日</div><div class="icon-cell">月</div>
+    <div class="icon-cell">星</div><div class="icon-cell">風</div><div class="icon-cell">雲</div><div class="icon-cell">雷</div>
+  </div>
+</div></section>
+
+<div class="cat"><h2>Feedback</h2></div>
+<section id="alert" class="demo"><div class="demo-header"><h3>Alert</h3><span class="sub">info · success · warning · error</span></div><div class="demo-body stack-v">
+  <div class="alert"><div><div class="alert-title">알림</div><div class="alert-msg">새로운 턴이 시작됐습니다.</div></div></div>
+  <div class="alert success"><div><div class="alert-title">승리</div><div class="alert-msg">상대의 돌을 모두 포위했습니다.</div></div></div>
+  <div class="alert warning"><div><div class="alert-title">주의</div><div class="alert-msg">남은 시간이 30초 이하입니다.</div></div></div>
+  <div class="alert error"><div><div class="alert-title">오류</div><div class="alert-msg">연결이 끊어졌습니다.</div></div></div>
+</div></section>
+<section id="toast" class="demo"><div class="demo-header"><h3>Toast</h3><span class="sub">stacked notifications</span></div><div class="demo-body stack-v">
+  <div class="toast">✓ 자동 저장 완료</div><div class="toast">↑ 레벨 업! 초단 → 이단</div><div class="toast">⚐ 새 도전자 입장</div>
+</div></section>
+<section id="tooltip" class="demo"><div class="demo-header"><h3>Tooltip</h3><span class="sub">hover to reveal</span></div><div class="demo-body">
+  <div class="tooltip-wrap"><button class="btn ghost" onmouseover="this.nextElementSibling.style.display='block'" onmouseout="this.nextElementSibling.style.display='none'">龍 호버</button><span class="tooltip" style="display:none">하늘을 다스리는 존재</span></div>
+</div></section>
+<section id="spinner" class="demo"><div class="demo-header"><h3>Spinner</h3><span class="sub">indeterminate</span></div><div class="demo-body" style="align-items:center"><div class="spinner"></div><div class="spinner" style="width:40px; height:40px; border-width:4px"></div></div></section>
+<section id="loadingdots" class="demo"><div class="demo-header"><h3>LoadingDots</h3><span class="sub">pulse cluster</span></div><div class="demo-body" style="align-items:center"><div class="dots"><span></span><span></span><span></span></div><span style="font-size:13px; color:var(--era-ink-muted)">상대의 수를 계산 중…</span></div></section>
+<section id="skeleton" class="demo"><div class="demo-header"><h3>Skeleton</h3><span class="sub">loading placeholder</span></div><div class="demo-body">
+  <div style="display:flex; gap:12px; align-items:center; width:300px"><div class="skeleton avatar"></div><div style="flex:1"><div class="skeleton line" style="width:60%"></div><div class="skeleton line"></div><div class="skeleton line" style="width:80%"></div></div></div>
+</div></section>
+<section id="progress" class="demo"><div class="demo-header"><h3>Progress</h3><span class="sub">linear · ring</span></div><div class="demo-body" style="align-items:center">
+  <div class="progress-bar"><div class="bar" style="width:68%"></div></div>
+  <div class="progress-ring"><svg width="56" height="56" viewBox="0 0 56 56"><circle class="ring-bg" cx="28" cy="28" r="22"/><circle class="ring-fg" cx="28" cy="28" r="22" stroke-dasharray="138.23" stroke-dashoffset="44.23"/></svg><span class="ring-label">68%</span></div>
+</div></section>
+<section id="emptystate" class="demo"><div class="demo-header"><h3>EmptyState</h3><span class="sub">no data</span></div><div class="demo-body">
+  <div class="empty"><div style="font-size:32px; opacity:0.5">🎐</div><h4>아직 기보가 없어요</h4><p>첫 수를 두는 순간 채워집니다.</p><button class="btn primary sm">판 시작</button></div>
+</div></section>
+<section id="syncstatus" class="demo"><div class="demo-header"><h3>SyncStatus</h3><span class="sub">connected · syncing · offline</span></div><div class="demo-body">
+  <span class="sync"><span class="ind"></span>연결됨</span><span class="sync syncing"><span class="ind"></span>동기화 중</span><span class="sync offline"><span class="ind"></span>오프라인</span>
+</div></section>
+
+<div class="cat"><h2>Navigation</h2></div>
+<section id="breadcrumb" class="demo"><div class="demo-header"><h3>Breadcrumb</h3><span class="sub">현재 위치</span></div><div class="demo-body">
+  <nav class="bread"><a href="#">홈</a><span class="sep-s">/</span><a href="#">보드</a><span class="sep-s">/</span><a href="#">동양 컬렉션</a><span class="sep-s">/</span><span class="current">龍虎相搏</span></nav>
+</div></section>
+<section id="tabs" class="demo"><div class="demo-header"><h3>Tabs</h3><span class="sub">tabbed panels</span></div><div class="demo-body stack-v">
+  <div class="tabs" id="tabs"><button class="active" data-i="0">개요</button><button data-i="1">규칙</button><button data-i="2">참가자</button><button data-i="3">역사</button></div>
+  <div class="tab-content" id="tabContent">개요 · 2-6인 전략판</div>
+</div></section>
+<section id="pagination" class="demo"><div class="demo-header"><h3>Pagination</h3><span class="sub">page numbers</span></div><div class="demo-body">
+  <div class="pag"><button disabled>‹</button><button>1</button><button class="active">2</button><button>3</button><button>4</button><button>…</button><button>12</button><button>›</button></div>
+</div></section>
+<section id="sidebar-cmp" class="demo"><div class="demo-header"><h3>Sidebar</h3><span class="sub">nav panel</span></div><div class="demo-body">
+  <div class="sb-demo"><div class="sbh">메뉴</div><div class="sbi">🏠 홈</div><div class="sbi active">🎲 보드 목록</div><div class="sbi">👥 참가자</div><div class="sbi">📜 기보</div><div class="sbh">관리</div><div class="sbi">⚙︎ 설정</div></div>
+</div></section>
+<section id="pagetree" class="demo"><div class="demo-header"><h3>PageTree</h3><span class="sub">hierarchical nav</span></div><div class="demo-body">
+  <div class="tree" id="tree">
+    <div class="node" data-t="1"><span class="caret open">▶</span>📁 동양 컬렉션</div>
+    <div class="children open">
+      <div class="node" data-t="2"><span class="caret open">▶</span>📁 4인용</div>
+      <div class="children open"><div class="node">📜 龍虎相搏</div><div class="node">📜 五行연환</div></div>
+      <div class="node" data-t="3"><span class="caret">▶</span>📁 6인용</div>
+      <div class="children"><div class="node">📜 陰陽布陣</div></div>
+    </div>
+  </div>
+</div></section>
+<section id="stepper" class="demo"><div class="demo-header"><h3>Stepper</h3><span class="sub">multi-step</span></div><div class="demo-body">
+  <div class="stepper">
+    <div class="st done"><div class="circle">✓</div><div class="lbl">入場</div></div><div class="line"></div>
+    <div class="st done"><div class="circle">✓</div><div class="lbl">編成</div></div><div class="line"></div>
+    <div class="st current"><div class="circle">3</div><div class="lbl">對局</div></div><div class="line"></div>
+    <div class="st"><div class="circle">4</div><div class="lbl">結算</div></div>
+  </div>
+</div></section>
+
+<div class="cat"><h2>Overlay</h2></div>
+<section id="modal" class="demo"><div class="demo-header"><h3>Modal</h3><span class="sub">dialog</span></div><div class="demo-body"><button class="btn primary" id="openModal">모달 열기</button></div></section>
+<section id="popover" class="demo"><div class="demo-header"><h3>Popover</h3><span class="sub">anchored</span></div><div class="demo-body">
+  <div class="popover-wrap" id="popWrap"><button class="btn ghost" id="popBtn">설정 ▾</button><div class="popover">난이도, 시간 제한 등을 조정.</div></div>
+</div></section>
+<section id="dropdown" class="demo"><div class="demo-header"><h3>DropdownMenu</h3><span class="sub">menu items</span></div><div class="demo-body">
+  <div class="menu"><div class="mi">👤 프로필 보기</div><div class="mi">⚙︎ 환경설정</div><div class="mi">📜 기보 내보내기</div><hr><div class="mi danger">⎋ 로그아웃</div></div>
+</div></section>
+<section id="command" class="demo"><div class="demo-header"><h3>CommandPalette</h3><span class="sub">⌘K</span></div><div class="demo-body">
+  <div class="cmdp"><input class="cmd-input" placeholder="명령을 검색하거나 입력…">
+    <div class="cmd-list"><div class="cmd-item selected"><span>새 대국 시작</span><span class="kbd">⌘N</span></div><div class="cmd-item"><span>난이도 변경</span><span class="kbd">⌘L</span></div><div class="cmd-item"><span>판 초기화</span><span class="kbd">⌘R</span></div><div class="cmd-item"><span>도움말 열기</span><span class="kbd">⌘?</span></div></div>
+  </div>
+</div></section>
+
+<div class="cat"><h2>Data</h2></div>
+<section id="datatable" class="demo"><div class="demo-header"><h3>DataTable</h3><span class="sub">sortable</span></div><div class="demo-body">
+  <table class="table"><thead><tr><th>순위</th><th>기사</th><th>승률</th><th>평점</th></tr></thead>
+  <tbody><tr><td>1</td><td>龍王</td><td>87%</td><td>2412</td></tr><tr><td>2</td><td>虎王</td><td>82%</td><td>2388</td></tr><tr><td>3</td><td>鳳</td><td>78%</td><td>2354</td></tr></tbody></table>
+</div></section>
+<section id="kanban" class="demo"><div class="demo-header"><h3>KanbanBoard</h3><span class="sub">drag columns</span></div><div class="demo-body">
+  <div class="kan">
+    <div class="kan-col"><h5>대기 · 待</h5><div class="kan-card">동양풍 토큰 정의</div><div class="kan-card">Dice 컴포넌트 설계</div></div>
+    <div class="kan-col"><h5>진행 · 行</h5><div class="kan-card">PatternBackground 구현</div></div>
+    <div class="kan-col"><h5>완료 · 了</h5><div class="kan-card">테마 문서 v1</div><div class="kan-card">프로토타입 아티팩트</div></div>
+  </div>
+</div></section>
+<section id="dragdrop" class="demo"><div class="demo-header"><h3>DragDrop</h3><span class="sub">reorder</span></div><div class="demo-body">
+  <div class="dnd"><div class="dnd-item">⋮⋮ 1. 돌 종류 선택</div><div class="dnd-item">⋮⋮ 2. 판 위치 지정</div><div class="dnd-item">⋮⋮ 3. 턴 종료 서명</div><div class="dnd-item">⋮⋮ 4. 결과 저장</div></div>
+</div></section>
+<section id="calendar" class="demo"><div class="demo-header"><h3>Calendar</h3><span class="sub">month view</span></div><div class="demo-body">
+  <div class="cal"><div class="cal-head"><button class="btn ghost sm">‹</button><h5>4月 2026</h5><button class="btn ghost sm">›</button></div>
+    <div class="cal-grid">
+      <div class="cal-dow">日</div><div class="cal-dow">月</div><div class="cal-dow">火</div><div class="cal-dow">水</div><div class="cal-dow">木</div><div class="cal-dow">金</div><div class="cal-dow">土</div>
+      <div class="cal-day muted">29</div><div class="cal-day muted">30</div><div class="cal-day muted">31</div><div class="cal-day">1</div><div class="cal-day">2</div><div class="cal-day">3</div><div class="cal-day">4</div>
+      <div class="cal-day">5</div><div class="cal-day">6</div><div class="cal-day">7</div><div class="cal-day">8</div><div class="cal-day">9</div><div class="cal-day">10</div><div class="cal-day">11</div>
+      <div class="cal-day">12</div><div class="cal-day">13</div><div class="cal-day">14</div><div class="cal-day">15</div><div class="cal-day">16</div><div class="cal-day">17</div><div class="cal-day selected">18</div>
+      <div class="cal-day">19</div><div class="cal-day">20</div><div class="cal-day">21</div><div class="cal-day">22</div><div class="cal-day">23</div><div class="cal-day today">24</div><div class="cal-day">25</div>
+      <div class="cal-day">26</div><div class="cal-day">27</div><div class="cal-day">28</div><div class="cal-day">29</div><div class="cal-day">30</div><div class="cal-day muted">1</div><div class="cal-day muted">2</div>
+    </div>
+  </div>
+</div></section>
+<section id="accordion" class="demo"><div class="demo-header"><h3>Accordion</h3><span class="sub">expandable</span></div><div class="demo-body">
+  <div class="acc" id="acc">
+    <div class="acc-item open"><button class="acc-head"><span>게임의 규칙</span><span class="chev">▶</span></button><div class="acc-body">번갈아 한 수씩 둔다.</div></div>
+    <div class="acc-item"><button class="acc-head"><span>승리 조건</span><span class="chev">▶</span></button><div class="acc-body">상대 수를 모두 포획하거나 영역을 다수 차지.</div></div>
+    <div class="acc-item"><button class="acc-head"><span>시대별 변형</span><span class="chev">▶</span></button><div class="acc-body">과거는 먹선, 현대는 네온 트레일이 수를 추적.</div></div>
+  </div>
+</div></section>
+
+<div class="cat"><h2>Editor · Media</h2></div>
+<section id="markdown" class="demo"><div class="demo-header"><h3>MarkdownEditor</h3><span class="sub">toolbar + textarea</span></div><div class="demo-body">
+  <div class="md"><div class="md-tool"><button><b>B</b></button><button><i>I</i></button><button>H1</button><button>H2</button><button>&gt;</button><button>•</button></div>
+  <textarea># 龍虎相搏
+
+오늘의 수는 **중앙**을 향한다.
+
+- 시작: 4-4 포석
+- 중반: 양날개 벌림</textarea></div>
+</div></section>
+<section id="audio" class="demo"><div class="demo-header"><h3>AudioRecorder</h3><span class="sub">recording UI</span></div><div class="demo-body">
+  <div class="rec"><button class="rec-btn" id="recBtn">●</button><div class="rec-wave" id="recWave"></div><div class="rec-time" id="recTime">00:00</div></div>
+</div></section>
+
+<div class="cat"><h2>Chat</h2></div>
+<section id="promptinput" class="demo"><div class="demo-header"><h3>PromptInput</h3><span class="sub">chat input</span></div><div class="demo-body">
+  <div class="prompt"><textarea placeholder="다음 수를 묻거나 전략을 입력하세요…"></textarea><button class="send">➤</button></div>
+</div></section>
+<section id="chatbubble" class="demo"><div class="demo-header"><h3>ChatBubble</h3><span class="sub">me · ai</span></div><div class="demo-body">
+  <div class="chat">
+    <div class="bubble ai">현재 판세에서는 우하귀 화점이 가장 유력합니다.</div>
+    <div class="bubble me">좌상귀로 방향을 틀면?</div>
+    <div class="bubble ai">3수 앞에서 상대가 침입을 시도할 확률이 있습니다.</div>
+    <div class="bubble me">알겠습니다.</div>
+  </div>
+</div></section>
+
+<p style="margin-top:60px; text-align:center; font-size:11px; color:var(--era-ink-muted)">data-era 속성 하나로 45개 컴포넌트 전체가 동시 재조판됩니다 · OFL 1.1 폰트</p>
+</main>
+</div>
+
+<div class="modal-backdrop" id="modal">
+  <div class="modal-panel"><h4>종료하시겠어요?</h4><p>진행 중인 대국은 자동으로 기보에 저장됩니다.</p><div class="modal-foot"><button class="btn ghost" id="modalCancel">취소</button><button class="btn danger" id="modalConfirm">종료</button></div></div>
+</div>
+
+<script>
+const root = document.documentElement;
+const toggleBtns = document.querySelectorAll('.toggle button');
+const $ = (id) => document.getElementById(id);
+
+function applyEraCopy(era) {
+  if (era === 'heritage') {
+    $('brandText').textContent = 'Oriental DS · 45 Components';
+    $('tgH1').textContent = '龍虎相搏';
+    $('tgH2').textContent = '과거의 결, 현재의 빛';
+  } else {
+    $('brandText').textContent = 'ORIENTAL DS · 45 MODULES';
+    $('tgH1').textContent = 'DRAGON × TIGER';
+    $('tgH2').textContent = 'NEON MEETS PORCELAIN';
+  }
+}
+toggleBtns.forEach(btn => {
+  btn.addEventListener('click', () => {
+    const era = btn.dataset.era;
+    root.setAttribute('data-era', era);
+    toggleBtns.forEach(b => b.classList.toggle('active', b === btn));
+    applyEraCopy(era);
+  });
+});
+document.getElementById('iconGrid').addEventListener('click', (e) => {
+  if (e.target.classList.contains('icon-cell')) {
+    document.querySelectorAll('#iconGrid .icon-cell').forEach(c => c.classList.remove('active'));
+    e.target.classList.add('active');
+  }
+});
+const tabTxt = ['개요 · 2-6인 전략판','규칙 · 번갈아 한 수씩, 포위시 포획','참가자 · 최대 6명, 팀전 가능','역사 · 19세기 동양 보드 게임 재해석'];
+document.getElementById('tabs').addEventListener('click', (e) => {
+  const btn = e.target.closest('button'); if (!btn) return;
+  document.querySelectorAll('#tabs button').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('tabContent').textContent = tabTxt[parseInt(btn.dataset.i)];
+});
+document.getElementById('tree').addEventListener('click', (e) => {
+  const node = e.target.closest('.node[data-t]'); if (!node) return;
+  const caret = node.querySelector('.caret');
+  const children = node.nextElementSibling;
+  if (!children || !children.classList.contains('children')) return;
+  caret.classList.toggle('open');
+  children.classList.toggle('open');
+});
+const modal = document.getElementById('modal');
+document.getElementById('openModal').onclick = () => modal.classList.add('open');
+document.getElementById('modalCancel').onclick = () => modal.classList.remove('open');
+document.getElementById('modalConfirm').onclick = () => modal.classList.remove('open');
+modal.addEventListener('click', (e) => { if (e.target === modal) modal.classList.remove('open'); });
+const popWrap = document.getElementById('popWrap');
+document.getElementById('popBtn').onclick = (e) => { e.stopPropagation(); popWrap.classList.toggle('open'); };
+document.addEventListener('click', (e) => { if (!popWrap.contains(e.target)) popWrap.classList.remove('open'); });
+document.getElementById('acc').addEventListener('click', (e) => {
+  const head = e.target.closest('.acc-head'); if (!head) return;
+  head.parentElement.classList.toggle('open');
+});
+const recBtn = document.getElementById('recBtn');
+const recWave = document.getElementById('recWave');
+const recTime = document.getElementById('recTime');
+for (let i = 0; i < 40; i++) { const s = document.createElement('span'); s.style.animationDelay = (i * 0.04) + 's'; recWave.appendChild(s); }
+let recOn = false, recStart = 0, recTimer = null;
+recBtn.onclick = () => {
+  recOn = !recOn;
+  recBtn.classList.toggle('active', recOn);
+  recBtn.textContent = recOn ? '■' : '●';
+  if (recOn) { recStart = Date.now(); recTimer = setInterval(() => { const s = Math.floor((Date.now() - recStart) / 1000); recTime.textContent = String(Math.floor(s/60)).padStart(2,'0') + ':' + String(s%60).padStart(2,'0'); }, 250); }
+  else { clearInterval(recTimer); recTime.textContent = '00:00'; }
+};
+</script>
+</body>
+</html>

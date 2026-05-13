@@ -1,0 +1,263 @@
+import { Meta } from "@storybook/blocks";
+
+<Meta title="Anatomy/Tabs" />
+
+# Tabs — Anatomy, Do·Don't, Spec
+
+`Tabs` is the canonical wayfinding control for switching between sibling
+panels of related content. The component implements the WAI-ARIA Tabs
+pattern with **manual activation** (Arrow keys move focus only — the
+panel does not change until the user presses Enter or Space) and a
+single-stop **roving tabindex** so the tablist is one Tab stop in the
+page sequence, not one stop per tab.
+
+This page is the contract for using `Tabs` correctly: the parts that
+make up the component, the keyboard / focus / a11y guarantees you can
+rely on, and the patterns that go wrong when consumers reach for
+`role="tab"` markup by hand.
+
+---
+
+## Anatomy
+
+```
+┌──────────────────────────────────────────────────────┐
+│  ┌────────┐ ┌──────┐ ┌────────┐                      │ ← tablist (role="tablist")
+│  │ Tab A  │ │Tab B │ │ Tab C  │                      │   • horizontal flex row
+│  └────────┘ └──────┘ └────────┘                      │   • bottom border = era-soft
+│  ▔▔▔▔▔▔▔▔                                            │ ← active indicator
+│                                                      │   (border-b-2 accent-600)
+│  Active panel content rendered here.                 │ ← tabpanel (role="tabpanel")
+│  Body text uses text-era-primary at text-sm.         │   • tabIndex=0 (focusable)
+│                                                      │   • aria-labelledby → tab id
+└──────────────────────────────────────────────────────┘
+```
+
+| Part         | Element                  | Role / attributes                                                                          |
+| ------------ | ------------------------ | ------------------------------------------------------------------------------------------ |
+| **Root**     | `<div>`                  | Container, forwards ref + native HTML attrs                                                |
+| **Tablist**  | `<div>`                  | `role="tablist"`, `aria-orientation="horizontal"`                                          |
+| **Tab**      | `<button type="button">` | `role="tab"`, `aria-selected`, `aria-controls`, `tabIndex={0 \| -1}` (roving), `disabled?` |
+| **Panel**    | `<div>`                  | `role="tabpanel"`, `aria-labelledby`, `tabIndex={0}` — only the active item is rendered    |
+| **Indicator**| Active tab's bottom border | Visual only — `border-b-2 border-[rgb(var(--accent-600))]` on the active tab            |
+
+The tab `id` and panel `id` are derived from a `useId()` base, so
+multiple `Tabs` instances on the same page never collide.
+
+---
+
+## Props
+
+| Prop             | Type                                          | Default          | Notes                                                                  |
+| ---------------- | --------------------------------------------- | ---------------- | ---------------------------------------------------------------------- |
+| `items`          | `ReadonlyArray<TabItem>` **(required)**       | —                | `{ value, label, content?, disabled? }`. `value` must be unique.       |
+| `value`          | `string`                                      | —                | Controlled active tab. When set, the component is fully controlled.    |
+| `defaultValue`   | `string`                                      | `items[0].value` | Uncontrolled initial selection.                                        |
+| `onChange`       | `(value: string) => void`                     | —                | Fires on click or Enter/Space activation. Not fired on focus moves.    |
+| `className`      | `string`                                      | —                | Composed via `cn()` onto the root `<div>`.                             |
+| native `<div>` props | `HTMLAttributes<HTMLDivElement>`          | —                | All native `<div>` attrs pass through (sans `onChange`).               |
+
+See **`Components/Tabs`** for the autodocs prop table and the rendered
+control playground.
+
+---
+
+## Do
+
+### Do — controlled tabs synced to URL or external state
+
+```tsx
+const [tab, setTab] = useState("overview");
+
+<Tabs
+  items={[
+    { value: "overview", label: "개요", content: <OverviewPanel /> },
+    { value: "rules", label: "규칙", content: <RulesPanel /> },
+  ]}
+  value={tab}
+  onChange={setTab}
+/>;
+```
+
+Use the controlled form whenever the active tab needs to live in URL
+state (deep linking), persist across re-mounts, or sync with sibling UI.
+
+### Do — disable individual tabs declaratively
+
+```tsx
+<Tabs
+  items={[
+    { value: "draft", label: "초안", content: <DraftPanel /> },
+    { value: "review", label: "검토", content: <ReviewPanel />, disabled: !canReview },
+    { value: "publish", label: "게시", content: <PublishPanel />, disabled: !canPublish },
+  ]}
+/>
+```
+
+Disabled tabs render with `disabled` on the button and are skipped by
+keyboard navigation — Arrow keys walk past them, Home/End jump to the
+first/last **enabled** tab. Never hide them by filtering the array
+unless they should not exist; disabling preserves the visual mental
+model of the workflow.
+
+### Do — let labels truncate, not the list
+
+The tab label is capped at `max-w-[10rem]` with `truncate`. Long labels
+ellipsize cleanly. The tablist itself is `overflow-x-auto`, so a tab set
+that exceeds the row width scrolls horizontally rather than wrapping.
+Keep labels tight — three to seven characters reads best — and trust
+the truncation when the consumer feeds long text.
+
+### Do — render rich content in `label` when needed
+
+```tsx
+<Tabs
+  items={[
+    {
+      value: "alerts",
+      label: (
+        <span className="flex items-center gap-1.5">
+          <BellIcon /> Alerts <Tag size="sm">3</Tag>
+        </span>
+      ),
+      content: <AlertList />,
+    },
+  ]}
+/>
+```
+
+`label` accepts `ReactNode`, so icons + counters compose naturally.
+The active state is conveyed by the underline + `text-[rgb(var(--era-accent-strong))]`
+(see **Conventions Discovered** in CLAUDE.md, rule #5) — your custom
+label inherits it.
+
+---
+
+## Don't
+
+### Don't — wire your own `role="tab"` markup
+
+```tsx
+{/* ❌ Wrong — bypasses roving tabindex, ARIA wiring, keyboard skip-disabled */}
+<div role="tablist">
+  <button role="tab" aria-selected>One</button>
+  <button role="tab">Two</button>
+</div>
+```
+
+The component owns the `aria-controls` ↔ `aria-labelledby` wiring, the
+roving `tabIndex` (only the active tab is `tabIndex=0`), the
+`findEnabledIndex` walk that skips disabled neighbours, and the
+manual-activation contract. Hand-rolled tabs lose every one of these.
+
+### Don't — use `Tabs` for navigation between routes
+
+```tsx
+{/* ❌ Wrong — Tabs is for sibling panels, not page navigation */}
+<Tabs
+  items={[
+    { value: "/dashboard", label: "Dashboard" },
+    { value: "/settings", label: "Settings" },
+  ]}
+  onChange={(v) => router.push(v)}
+/>
+```
+
+Reach for **`Components/Sidebar`** or a `<nav>` with `<a>` elements. The
+ARIA Tabs pattern implies the panels are siblings on the same page; a
+screen reader will announce the destination as "tab", not "link".
+
+### Don't — render the panel content for every tab
+
+The component already only renders the active panel. If you keep the
+inactive panels mounted (e.g. by ignoring the prop and rendering all
+children yourself), you defeat the lazy-mount benefit and the
+`aria-labelledby` linkage breaks because each panel has the same id.
+
+### Don't — pass empty `items` and expect an empty placeholder
+
+`Tabs` does not ship an empty state. When `items.length === 0`, the
+tablist renders an empty `<div role="tablist">`, which violates
+`aria-required-children`. Either render a placeholder one level up
+(e.g. `<EmptyState>` directly), or guarantee at least one tab.
+
+### Don't — reach for `tabIndex` on individual tabs
+
+```tsx
+{/* ❌ Wrong — overrides the roving tabindex contract */}
+<Tabs items={items.map((it) => ({ ...it, tabIndex: 0 }))} />
+```
+
+`TabItem` does not accept `tabIndex` (it is not in the type), and the
+component manages it internally. All non-active tabs are `tabIndex=-1`
+so the tablist counts as **one** Tab stop in the page sequence, not one
+stop per tab. This is the WAI-ARIA Tabs pattern; do not undo it.
+
+---
+
+## Spec — keyboard / focus / motion / a11y contract
+
+### Keyboard
+
+| Key                            | Behaviour                                                                                  |
+| ------------------------------ | ------------------------------------------------------------------------------------------ |
+| `Tab` (entering)               | Focus enters the tablist on the **active** tab (the only `tabIndex=0` button).             |
+| `Tab` (leaving)                | Focus leaves the tablist forward into the panel; **does not** cycle back to the next tab.  |
+| `Shift+Tab`                    | Focus leaves the tablist backward to the prior focusable element.                          |
+| `ArrowRight` / `ArrowDown`     | Move focus to the next enabled tab. Wraps to the first tab past the last.                  |
+| `ArrowLeft` / `ArrowUp`        | Move focus to the previous enabled tab. Wraps to the last tab before the first.            |
+| `Home`                         | Move focus to the first enabled tab.                                                       |
+| `End`                          | Move focus to the last enabled tab.                                                        |
+| `Enter` / `Space`              | **Activate** the focused tab (manual-activation pattern). `onChange` fires.                |
+
+Wave 5b2 change: only the active tab is `tabIndex=0`. The tablist is
+**one** Tab stop, not N. `Tab` from inside the tablist exits to the
+panel — it no longer cycles between tabs (use Arrows for that).
+
+RTL note: the WAI-ARIA Tabs pattern keeps **physical** Arrow keys in
+RTL — `ArrowRight` always moves to the next item in the data array,
+regardless of writing direction. This matches industry consensus
+across major component libraries; do not invert the keys under
+`dir="rtl"`.
+
+### Focus
+
+- The active tab carries `tabIndex=0`; all others carry `tabIndex=-1`.
+- Click moves focus to the clicked tab and activates it in the same
+  gesture.
+- The panel is `tabIndex=0` so keyboard users can move focus into the
+  panel content; this is how `Tab` exits the tablist.
+- The focus ring is `ring-2 ring-[rgb(var(--accent-500)/0.3)]` — reads
+  on both Heritage cream and Neon void surfaces.
+
+### Motion
+
+- Active-state transitions use `transition-colors duration-era ease-era-brush`.
+- No opacity ramps in entry animations — the active border / colour
+  change is colour-only (no `opacity-*` modifier), so axe
+  colour-contrast sampling is stable mid-frame (see CLAUDE.md
+  Conventions Discovered #1).
+
+### A11y contract
+
+- `role="tablist"` on the row, `aria-orientation="horizontal"` to teach
+  AT to announce Arrow keys for navigation.
+- Each tab: `role="tab"`, `aria-selected`, `aria-controls={panelId}`.
+- Each panel: `role="tabpanel"`, `aria-labelledby={tabId}`.
+- Disabled tabs carry `disabled` on the button (HTML default) — AT
+  announces "dimmed" / "unavailable" without further ARIA.
+- Active text colour reads `text-[rgb(var(--era-accent-strong))]`
+  (Heritage `accent-700`, Neon `accent-300`) — this is the only safe
+  active colour pair across both eras (see **Conventions Discovered**
+  #5).
+- WCAG 2.1 AA contrast: passes on both eras for active and inactive
+  states. Verified by the Storybook test-runner axe gate (382 stories
+  baseline).
+
+### Cross-references
+
+- **`Components/Tabs`** — autodocs, all stories, interactive playground
+- **`Anatomy/Sidebar`** — for route navigation (the *not-Tabs* sibling)
+- **`Foundations/Accessibility`** — focus-ring + roving-tabindex conventions
+- **WAI-ARIA Authoring Practices — Tabs** — the upstream pattern this
+  component implements

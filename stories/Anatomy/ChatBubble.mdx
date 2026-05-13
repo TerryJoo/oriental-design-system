@@ -1,0 +1,215 @@
+import { Meta } from "@storybook/blocks";
+
+<Meta title="Anatomy/ChatBubble" />
+
+# ChatBubble — Anatomy, Do/Don't, Spec
+
+`ChatBubble` is a single message in a conversational UI, paired with the
+`ChatThread` container. The bubble distinguishes two authors —`me` (the
+current user, right-aligned, accent fill) and `ai` (the counterpart,
+left-aligned, neutral fill) — and supports avatar and metadata slots without
+prescribing a status / timestamp shape.
+
+For the full prop reference and live author/avatar matrix, see
+[Components/ChatBubble](?path=/docs/components-chatbubble--docs).
+
+---
+
+## Anatomy
+
+```
+me  (self-end, flex-row-reverse)        ai  (self-start)
+┌────────────────────────────────┐      ┌────────────────────────────────┐
+│  ⑤ avatar?    ┌──────────────┐ │      │ ┌──────────────┐    ⑤ avatar?  │
+│  (aria-       │ ① bubble     │ │      │ │ ① bubble     │    (aria-     │
+│   hidden)     │  ② children  │ │      │ │  ② children  │     hidden)   │
+│               └──────────────┘ │      │ └──────────────┘               │
+│               ④ meta?          │      │  ④ meta?                       │
+└────────────────────────────────┘      └────────────────────────────────┘
+                  ③ ChatThread (role="log" aria-live="polite") wraps siblings
+```
+
+| #   | Part        | Source                                                                                                                          |
+| --- | ----------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| ①   | Bubble      | `<div role="group" data-author={author}>` rendered by `chatBubbleStyles`. Carries fill, ink, and asymmetric corner radii.       |
+| ②   | Children    | The message body. Plain text, rich nodes, or composed reply blocks — anything `ReactNode`.                                      |
+| ③   | Thread      | `<ChatThread role="log" aria-live="polite">` wraps a list of bubbles. Stack via `chatThread` (vertical, `gap-2.5`, `max-w-xl`). |
+| ④   | Meta slot   | Optional `<span>` rendered under the bubble. Right-aligned for `me`, left-aligned for `ai`. Use for timestamps / send status.   |
+| ⑤   | Avatar slot | Optional `aria-hidden="true"` slot rendered next to the bubble (reversed for `me`).                                             |
+
+The bubble's corner radii are deliberately asymmetric — the corner closest to
+the author's edge is squared off (`4px`) so each bubble visually "leans"
+toward its author column. Heritage and Neon eras share the geometry; only the
+fill, ink, and shadow tokens swap.
+
+---
+
+## Props (grouped)
+
+The full table lives in [Components/ChatBubble](?path=/docs/components-chatbubble--docs).
+Quick groups:
+
+### `<ChatBubble>`
+
+- **Author** — `author` (`me` · `ai`, default `ai`). Drives alignment, fill, ink, and the squared corner.
+- **Slots** — `avatar?`, `meta?`, `children`. The avatar slot is `aria-hidden="true"` (decorative); semantic identity belongs in `meta` or surrounding context.
+- **Native** — extends `HTMLAttributes<HTMLDivElement>`, so `id`, `className`, `data-*`, `onClick`, etc. all pass through.
+
+### `<ChatThread>`
+
+- A thin wrapper applying `flex flex-col gap-2.5 w-full max-w-xl`, plus `role="log" aria-live="polite"` for screen-reader announcement of incoming messages.
+- Native — extends `HTMLAttributes<HTMLDivElement>`. Use `className` to widen / narrow the column.
+
+---
+
+## Do
+
+```tsx
+// ✅ Wrap a stream of bubbles in <ChatThread>. The role="log" + polite
+//    live region announces incoming messages without interrupting.
+<ChatThread>
+  <ChatBubble author="ai">안녕하세요. 무엇을 도와드릴까요?</ChatBubble>
+  <ChatBubble author="me">주문 내역을 알려주세요.</ChatBubble>
+</ChatThread>
+```
+
+```tsx
+// ✅ Use the meta slot for timestamps / send status. The bubble itself
+//    stays focused on the message body.
+<ChatBubble author="me" meta="오후 3:24 · 읽음">
+  네, 확인했습니다.
+</ChatBubble>
+```
+
+```tsx
+// ✅ Pair with an Avatar for identity — the avatar slot is decorative
+//    (aria-hidden), so the message remains the announced unit.
+<ChatBubble author="ai" avatar={<Avatar size="sm" name="K" />}>
+  주문 #1234를 찾았습니다.
+</ChatBubble>
+```
+
+```tsx
+// ✅ Rich content is fine — the bubble is just a styled container.
+<ChatBubble author="ai">
+  <p>아래 옵션 중 선택해 주세요.</p>
+  <ul className="mt-1 list-disc pl-5">
+    <li>Option A</li>
+    <li>Option B</li>
+  </ul>
+</ChatBubble>
+```
+
+```tsx
+// ✅ Composed reply blocks — embed quoted text, links, etc. as children.
+<ChatBubble author="me">
+  <blockquote className="border-l-2 pl-2 mb-1 opacity-80 text-xs">
+    이전 메시지 인용
+  </blockquote>
+  네, 그 부분 처리했습니다.
+</ChatBubble>
+```
+
+---
+
+## Don't
+
+```tsx
+// ❌ Hardcoding a fill — the era-aware accent color and Neon contrast
+//    override (text-white) are tuned to AA in both eras. Overrides will
+//    regress.
+<ChatBubble author="me" className="bg-accent-700 text-era-inverse">
+  hi
+</ChatBubble>
+```
+
+```tsx
+// ❌ Putting identity in the avatar slot only — it's aria-hidden.
+//    Use the meta slot or surrounding chrome for the speaker's name.
+<ChatBubble author="ai" avatar={<Avatar name="Kim" />}>
+  안녕하세요.
+</ChatBubble>
+```
+
+```tsx
+// ❌ Skipping <ChatThread> — losing role="log"/aria-live="polite" means
+//    new messages are not announced to assistive tech.
+<div className="flex flex-col gap-2">
+  <ChatBubble author="ai">…</ChatBubble>
+  <ChatBubble author="me">…</ChatBubble>
+</div>
+```
+
+```tsx
+// ❌ Treating the bubble as a button — it's role="group". For interactive
+//    bubbles (reply, react), nest a real Button or a focusable anchor inside.
+<ChatBubble author="ai" onClick={openMenu}>
+  …
+</ChatBubble>
+```
+
+```tsx
+// ❌ Loading a giant payload (1k+ messages) into a single ChatThread —
+//    the live region will fire announcements for every appended bubble.
+//    Virtualize and debounce announcements at the consumer level.
+```
+
+---
+
+## Spec
+
+### Keyboard
+
+ChatBubble is non-interactive by default — `role="group"` doesn't take focus.
+Native HTML attributes pass through, so consumers can opt in to interaction
+(e.g. `tabIndex={0}` + `onKeyDown` handlers, or by nesting Button/anchor
+elements as children) when reply / context menus are needed.
+
+### Focus
+
+- The bubble itself is not a focus target by default.
+- Interactive elements _inside_ the bubble (links, buttons) participate in
+  the regular tab order. Don't trap focus inside a bubble.
+- `<ChatThread>` is `role="log"` — it does not receive focus, but its content
+  is announced politely.
+
+### Motion
+
+- `transition-colors duration-era ease-era-brush` on the bubble — only fill /
+  border tween between era switches, not on append. There's no entry
+  animation; respecting the [no-opacity-ramp invariant](?path=/docs/foundations-accessibility--docs)
+  for transcript-style content.
+- Animations on appended bubbles must be supplied by the consumer and gated
+  on `motion-safe:` if used.
+
+### a11y contract
+
+- Each bubble carries `role="group"` plus `data-author` so screen readers
+  announce the message as a coherent unit and consumers can style per-author
+  via attribute selectors.
+- The thread is `role="log" aria-live="polite"` — new messages are queued by
+  AT and announced without interrupting current speech. Use `assertive` only
+  for system-critical announcements (you'd compose those at a higher level).
+- The avatar slot is `aria-hidden="true"`. Identity should live in `meta` or
+  the surrounding heading.
+- **Wave 5b2 contrast invariant**: `me`-author bubbles paint `text-era-inverse`
+  on `bg-accent-600` for Heritage (cream-on-terracotta, 5.91:1, AA ✓), and
+  override to `text-white` in Neon (`[[data-era=neon]_&]:text-white`). The
+  earlier Neon override used `text-era-primary` which landed at 4.44:1 and
+  failed AA by a hair. **Do not** override Neon ink for `me` bubbles —
+  the override is load-bearing.
+- Heritage `me` bubble: terracotta `accent-600` (#8A5030) + cream
+  `text-era-inverse` (#fbf5e8) = 5.91:1, AA ✓.
+- Neon `me` bubble: electric indigo `accent-600` (#5A50FF) + `text-white` =
+  5.22:1, AA ✓.
+- `ai` bubble: `bg-era-sunken` + `text-era-primary` — verified AA in both
+  eras (see [Foundations/Accessibility](?path=/docs/foundations-accessibility--docs)).
+
+---
+
+## Cross-references
+
+- [Components/ChatBubble](?path=/docs/components-chatbubble--docs) — full prop table, all author / avatar / meta stories.
+- [Components/Avatar](?path=/docs/components-avatar--docs) — pairs with the avatar slot.
+- [Foundations/Accessibility](?path=/docs/foundations-accessibility--docs) — `role="log"`, `aria-live` semantics, the `text-white` Neon override rationale.
+- [Foundations/Era](?path=/docs/foundations-era--docs) — `bg-era-sunken`, `--era-ink-inverse`, and the `[[data-era=neon]_&]:` arbitrary-variant pattern.

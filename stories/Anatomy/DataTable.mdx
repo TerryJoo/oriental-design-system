@@ -1,0 +1,372 @@
+import { Meta } from "@storybook/blocks";
+
+<Meta title="Anatomy/DataTable" />
+
+# DataTable — Anatomy, Do·Don't, Spec
+
+`DataTable<T>` is the canonical tabular-data primitive in the Oriental
+Design System. It is **generic on row shape**: the component itself
+knows nothing about your data, so every `cell(row)` renderer receives
+your real `T` and typos like `row.naem` are caught at compile time
+(see **`Patterns/Generics`** for the full TypeScript contract).
+
+`DataTable` is deliberately scope-minimal: render a `<table>` with
+typed columns, a screen-reader caption, an empty-state slot, and
+nothing else. Sorting, pagination, virtualization, and selection are
+**not** built in — compose them at the application level (see "Don't"
+below for the rationale).
+
+---
+
+## Anatomy
+
+```
+┌──────────────────────────────────────────────────────────┐
+│ <caption class="sr-only">Users — admin console</caption> │ ← caption (visually hidden)
+├──────────────┬─────────────────┬──────────┬──────────────┤
+│ NAME         │ EMAIL           │ ROLE     │              │ ← thead (role="rowgroup")
+│              │                 │          │              │   th[scope="col"]
+├──────────────┼─────────────────┼──────────┼──────────────┤
+│ Ada Lovelace │ ada@example.com │ admin    │              │ ← tbody (role="rowgroup")
+│ Alan Turing  │ alan@…          │ member   │              │   <tr> = role="row"
+│ Grace Hopper │ grace@…         │ admin    │              │   <td> = role="cell"
+└──────────────┴─────────────────┴──────────┴──────────────┘
+
+Empty state (data.length === 0):
+
+┌──────────────────────────────────────────────────────────┐
+│ NAME         │ EMAIL           │ ROLE     │              │ ← thead always renders
+├──────────────────────────────────────────────────────────┤
+│  ┌────────────────────────────────────────────────────┐  │
+│  │           [icon]                                   │  │ ← <td colSpan={N}>
+│  │           데이터가 없습니다                        │  │   wraps <EmptyState>
+│  │           표시할 행이 없습니다…                    │  │   data-testid="datatable-empty"
+│  └────────────────────────────────────────────────────┘  │
+└──────────────────────────────────────────────────────────┘
+```
+
+| Part           | Element                                | Role / attributes                                             |
+| -------------- | -------------------------------------- | ------------------------------------------------------------- |
+| **Root**       | `<table>`                              | Native `role="table"`, era-aware card surface, forwards ref   |
+| **Caption**    | `<caption class="sr-only">`            | Screen-reader-only label; rendered only when `caption` is set |
+| **Header row** | `<thead> > <tr> > <th scope="col">`    | Each column header carries `scope="col"` for AT row/column wiring |
+| **Body row**   | `<tbody> > <tr>`                       | Native `role="row"`; hover transition `duration-era-fast`     |
+| **Body cell**  | `<td>`                                 | Native `role="cell"`; alignment via `align?: "left" \| "center" \| "right"` |
+| **Empty cell** | `<tr> > <td colSpan={N}>`              | Single full-width cell containing `emptyState`; `data-testid="datatable-empty"` |
+
+The `<thead>` always renders even when `data` is empty so the column
+context stays visible to screen readers and the grid does not reflow
+when data resolves.
+
+---
+
+## Props
+
+`DataTable` is generic: `DataTable<T>` where `T` is your row shape.
+
+| Prop          | Type                                          | Default                                                        | Notes                                                                  |
+| ------------- | --------------------------------------------- | -------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| `data`        | `ReadonlyArray<T>` **(required)**             | —                                                              | The component never inspects fields; just forwards `row` to `cell()`.  |
+| `columns`     | `ReadonlyArray<DataTableColumn<T>>` **(required)** | —                                                          | `{ key, header, cell, align? }`. `key` must be unique.                 |
+| `rowKey`      | `(row: T, index: number) => string \| number` | `(_, i) => i`                                                 | Provide a stable identity extractor; the index default is unstable.    |
+| `caption`     | `ReactNode`                                   | —                                                              | Rendered as `<caption class="sr-only">` for AT.                        |
+| `emptyState`  | `ReactNode`                                   | `<EmptyState title="데이터가 없습니다" description="…" />`      | Rendered inside `<tbody>` as a `colSpan={columns.length}` cell when empty. |
+| `className`   | `string`                                      | —                                                              | Composed onto the root `<table>`.                                      |
+| native attrs  | `HTMLAttributes<HTMLTableElement>`            | —                                                              | All native `<table>` attrs pass through.                               |
+
+`DataTableColumn<T>`:
+
+```ts
+interface DataTableColumn<T> {
+  key: string;                                    // unique
+  header: ReactNode;                              // <th> content
+  cell: (row: T, rowIndex: number) => ReactNode;  // <td> renderer
+  align?: "left" | "center" | "right";            // applies to header + cell
+}
+```
+
+See **`Components/DataTable`** for the autodocs prop table.
+
+---
+
+## Do
+
+### Do — type your row and let TypeScript infer `T`
+
+```tsx
+import { DataTable, type DataTableColumn } from "@jyi/design-system";
+
+interface User {
+  id: string;
+  name: string;
+  email: string;
+  role: "admin" | "member" | "guest";
+}
+
+const users: ReadonlyArray<User> = await fetchUsers();
+const columns: DataTableColumn<User>[] = [
+  { key: "name", header: "Name", cell: (row) => row.name },
+  { key: "email", header: "Email", cell: (row) => row.email },
+  { key: "role", header: "Role", cell: (row) => <Tag size="sm">{row.role}</Tag> },
+];
+
+<DataTable<User>
+  data={users}
+  columns={columns}
+  rowKey={(row) => row.id}
+  caption="Users — admin console"
+/>;
+```
+
+The explicit `<DataTable<User>>` documents intent at the call site. See
+**`Patterns/Generics`** for when to write the generic argument
+explicitly versus letting TypeScript infer it.
+
+### Do — supply a stable `rowKey`
+
+```tsx
+<DataTable<User>
+  data={users}
+  columns={columns}
+  rowKey={(row) => row.id}   // stable identity → React reuses DOM nodes
+/>
+```
+
+Without `rowKey`, React keys off the array index. Index keys break
+selection state, focus, and animation across sort / filter / drag-reorder
+because the same DOM node is reused for a different row. Always
+provide an extractor when the row shape has an `id`.
+
+### Do — always pass a `caption`
+
+```tsx
+<DataTable<User>
+  data={users}
+  columns={columns}
+  caption="활성 사용자 — 관리 콘솔"
+/>
+```
+
+The caption renders as `<caption class="sr-only">` and is announced by
+screen readers when entering the table. It is the single most useful
+a11y improvement you can make for tabular data.
+
+### Do — customise the empty state for the user's intent
+
+```tsx
+{/* Filter context: actionable retry */}
+<DataTable<User>
+  data={filtered}
+  columns={columns}
+  emptyState={
+    <EmptyState
+      title="검색 결과가 없습니다"
+      description="필터를 초기화해 보세요."
+      actions={<Button onClick={resetFilters}>필터 초기화</Button>}
+    />
+  }
+/>
+
+{/* No-data context: leave the default Korean copy */}
+<DataTable<User> data={users} columns={columns} />
+```
+
+The default Korean copy ("데이터가 없습니다") is sensible without
+props; override only when the consumer needs a clearer recovery action.
+Pass `emptyState={null}` to opt back into the legacy bare-`<tbody>`
+behaviour. See **`Patterns/Empty States`** for the cross-component
+contract.
+
+### Do — defer loading state to a Skeleton row swap
+
+```tsx
+const PLACEHOLDER_ROWS = Array.from({ length: 4 }).map((_, i) => ({
+  id: `loading-${i}`,
+  name: "", email: "", role: "guest" as const,
+}));
+
+const LOADING_COLUMNS = columns.map((col) => ({
+  ...col,
+  cell: () => <Skeleton width={80} height={12} />,
+}));
+
+<DataTable<User>
+  data={isLoading ? PLACEHOLDER_ROWS : users}
+  columns={isLoading ? LOADING_COLUMNS : columns}
+  caption="Users"
+/>;
+```
+
+`<Skeleton>` already carries `aria-busy="true" aria-live="polite"`, so
+screen readers announce the busy state without `DataTable` needing
+extra ARIA. There is no `loading` prop — this swap is the contract.
+
+### Do — narrow union and optional fields inside `cell`
+
+```tsx
+type Member =
+  | { kind: "user"; id: string; name: string }
+  | { kind: "admin"; id: string; name: string; permissions: string[] };
+
+const columns: DataTableColumn<Member>[] = [
+  {
+    key: "perms",
+    header: "Permissions",
+    cell: (row) => (row.kind === "admin" ? row.permissions.join(", ") : "—"),
+  },
+];
+```
+
+Cells are render functions, not key paths. Narrow at the call site —
+do not lie to upstream consumers by widening the shared type. See
+**`Patterns/Generics`** §"Common pitfalls".
+
+---
+
+## Don't
+
+### Don't — expect built-in sorting
+
+```tsx
+{/* ❌ Wrong — DataTable does not ship sort UI. */}
+<DataTable<User> sortBy="name" sortDirection="asc" ... />
+```
+
+Sorting is **not** built in. Compose at the application level: keep
+the sort state alongside `useState`, sort the data array yourself, and
+render a `<Button variant="ghost">` in the column `header` that toggles
+the sort. This keeps the table primitive small and lets the consumer
+pick stable / unstable sort, locale-aware compare, multi-column sort,
+etc., without the component imposing one.
+
+### Don't — expect built-in pagination
+
+```tsx
+{/* ❌ Wrong — DataTable renders every row in `data`. */}
+<DataTable<User> data={hugeList} pageSize={25} />
+```
+
+There is no pagination prop. For paged data, slice the array before
+passing it in and compose a separate `<Pagination>` (see
+`Components/Pagination`) outside the table:
+
+```tsx
+<DataTable<User> data={users.slice(page * size, (page + 1) * size)} columns={columns} />
+<Pagination page={page} pageCount={Math.ceil(users.length / size)} onChange={setPage} />
+```
+
+For very large lists where slicing into the DOM is too expensive, a
+future `VirtualList<T>` will land alongside this primitive — until
+then, slice + paginate.
+
+### Don't — render JSX in `header` that breaks the `<th>` semantics
+
+```tsx
+{/* ❌ Wrong — nested <button> inside <th> is fine, but a wrapping <div role="button"> is not. */}
+{ key: "name", header: <div role="button">Name</div>, cell: (r) => r.name }
+```
+
+The header lives inside `<th scope="col">`. Native `<button>` elements
+inside it are fine and idiomatic for sortable columns. Avoid
+`role="button"` on a `<div>` — it loses the focus / Enter / Space
+handling and trips axe.
+
+### Don't — accessor-shorthand `cell` (it does not exist)
+
+```tsx
+{/* ❌ Wrong — there is no keyof T accessor; cell is always a function. */}
+{ key: "name", header: "Name", cell: "name" as keyof User }
+```
+
+`DataTableColumn<T>.cell` is `(row: T, rowIndex: number) => ReactNode`.
+A `keyof T` shorthand has no obvious render behaviour for non-text
+fields (dates, arrays, JSX) — render explicitly in the function. See
+**`Patterns/Generics`** §"Column accessor patterns".
+
+### Don't — mount the table without a `<thead>` for empty data
+
+The component already always renders `<thead>` so the column structure
+stays visible to screen readers when `data.length === 0`. Don't try to
+"hide" the table chrome on empty — render `<DataTable>` with
+`emptyState` and let the empty cell carry the message. Hiding the
+header re-introduces the layout-jump problem when data resolves.
+
+### Don't — pass an empty `columns` array
+
+```tsx
+{/* ❌ Wrong — `colSpan={0}` is invalid and the empty cell collapses. */}
+<DataTable<User> data={users} columns={[]} />
+```
+
+The component falls back to `colSpan={1}` defensively, but the result
+is a degenerate table. If you have no columns, you have no table —
+render `<EmptyState>` directly.
+
+---
+
+## Spec — keyboard / focus / motion / a11y contract
+
+### Keyboard
+
+`DataTable` itself does not capture keyboard events — it relies on the
+**native** semantics of `<table>` / `<tr>` / `<td>`:
+
+- `Tab` enters the table at the first focusable descendant (a button,
+  link, or interactive control inside a `<td>`), then walks through
+  all focusable descendants in document order.
+- `Shift+Tab` walks them in reverse.
+- The table itself does not steal focus and is not in the tab order.
+- AT users navigate via screen-reader table-mode shortcuts (e.g.
+  VoiceOver: `Ctrl+Option+Cmd+→` to step columns) — this is
+  enabled by `<th scope="col">` + native `<table>` semantics.
+
+When you need cell-level keyboard navigation (spreadsheet-style),
+compose a focus-trapped wrapper at the application level — that is
+out of scope for this primitive.
+
+### Focus
+
+- Focus rings on interactive descendants follow the consumer's own
+  styling (e.g. `Button`'s focus ring). The table primitive does not
+  add a focus ring of its own.
+- Hover / focus on `<tr>` shows a subtle background tint
+  (`hover:bg-[rgb(var(--accent-500)/0.05)]`); colour-only, no opacity
+  ramp.
+
+### Motion
+
+- Row hover transitions use `transition-colors duration-era-fast
+  ease-era-brush` — colour-only, no opacity, no transform.
+- The empty state inherits from `<EmptyState>` and uses no entry
+  animation by default.
+
+### A11y contract
+
+- Native `role="table"` / `role="row"` / `role="cell"` /
+  `role="columnheader"` are inherited from the underlying HTML
+  elements (no explicit `role` props are added).
+- `<th scope="col">` is always set on header cells — this is what
+  enables AT to announce "row 3 of 12, column Email" when navigating.
+- `<caption class="sr-only">` is rendered when `caption` is supplied;
+  it is announced on table entry.
+- The empty cell carries `data-testid="datatable-empty"` for testing
+  hooks and the embedded `<EmptyState>` provides the announceable copy
+  inside the table body.
+- WCAG 2.1 AA contrast: passes on both eras for header (`text-era-muted`
+  on `bg-era-sunken`), body (`text-era-primary` on `bg-era-raised`),
+  and hover (5% accent-500 tint).
+
+### Cross-references
+
+- **`Components/DataTable`** — autodocs, all stories
+- **`Patterns/Generics`** — `DataTable<T>` consumer contract, accessor
+  patterns, common pitfalls
+- **`Patterns/Empty States`** — `emptyState?: ReactNode` slot, default
+  copy, retry pattern
+- **`Components/EmptyState`** — base API used by the default empty cell
+- **`Components/Skeleton`** — loading-row primitive used in the
+  `DataTable.Loading` story
+- **`Components/Pagination`** — sibling component composed alongside
+  `DataTable` for paged data
+- **`Foundations/Accessibility`** — caption + scope contracts honoured
+  by the table

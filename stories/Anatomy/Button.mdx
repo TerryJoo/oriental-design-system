@@ -1,0 +1,182 @@
+import { Meta } from "@storybook/blocks";
+
+<Meta title="Anatomy/Button" />
+
+# Button — Anatomy, Do/Don't, Spec
+
+Button is the primary action surface of the design system. It composes a
+single semantic `<button>` element with an optional left icon, label, optional
+right icon, and an overlay loading spinner — all era-aware, all reading from
+the same set of tokens. This page is the per-author contract: read the
+anatomy, follow the Do list, avoid the Don't list, and respect the Spec
+when extending.
+
+For the full prop reference and live variant matrix, see
+[Components/Button](?path=/docs/components-button--docs).
+
+---
+
+## Anatomy
+
+```
+┌──────────────────────────────────────────────┐
+│  ① <button>  (era-aware container)           │
+│  ┌─────────────────────────────────────────┐ │
+│  │ ⑤ spinner (absolute, loading only)      │ │
+│  │ ② [leftIcon]   ③ label   ④ [rightIcon] │ │
+│  └─────────────────────────────────────────┘ │
+└──────────────────────────────────────────────┘
+```
+
+| #   | Part       | Source                                                                                               |
+| --- | ---------- | ---------------------------------------------------------------------------------------------------- |
+| ①   | Container  | The `<button>` element itself. Carries variant fill, era shadow, focus ring, and disabled chrome.    |
+| ②   | Left icon  | Optional `leftIcon` slot — `<span aria-hidden="true">` sized via `buttonIconSizes[size]`.            |
+| ③   | Label      | `children` wrapped in a `<span>`. During `loading`, the span gets `opacity-0` (preserves layout).    |
+| ④   | Right icon | Optional `rightIcon` slot — symmetrical to ②.                                                        |
+| ⑤   | Spinner    | Absolutely-positioned overlay rendered only when `loading` is true. Uses `motion-safe:animate-spin`. |
+
+The spinner's `absolute` positioning is intentional — it overlays the
+opacity-zeroed label so the button's _width_ never reflows when it transitions
+into the loading state. The icon spans receive `invisible` (not `opacity-0`)
+during loading so they collapse out of the visual flow but keep their slot
+allocation in the flex layout.
+
+---
+
+## Props (grouped)
+
+The full table lives in [Components/Button](?path=/docs/components-button--docs).
+Quick groups:
+
+- **Visual** — `variant` (`primary` · `secondary` · `ghost` · `seal` · `danger`), `size` (`sm` · `md` · `lg`), `shape` (`rounded` · `pill`).
+- **State** — `loading`, `disabled`. Setting either disables the button; `loading` additionally sets `aria-busy`.
+- **Slots** — `leftIcon`, `rightIcon`, `children` (label).
+- **Native** — `ButtonProps` extends `ButtonHTMLAttributes<HTMLButtonElement>`, so `onClick`, `type`, `aria-*`, `data-*`, `form`, etc. all pass through.
+
+---
+
+## Do
+
+```tsx
+// ✅ One primary per surface — clearest hierarchy.
+<div className="flex gap-2">
+  <Button variant="primary" onClick={save}>
+    저장
+  </Button>
+  <Button variant="secondary" onClick={cancel}>
+    취소
+  </Button>
+</div>
+```
+
+```tsx
+// ✅ Use `loading` for in-flight async work — the label width is preserved.
+<Button loading={isSaving} onClick={save}>
+  저장
+</Button>
+```
+
+```tsx
+// ✅ Pair iconography with a label for clarity.
+<Button variant="primary" leftIcon={<SaveIcon />} onClick={save}>
+  저장
+</Button>
+```
+
+```tsx
+// ✅ Use `variant="danger"` for destructive, irreversible actions only.
+<Button variant="danger" onClick={confirmDelete}>
+  영구 삭제
+</Button>
+```
+
+```tsx
+// ✅ Use `variant="seal"` (낙관/도장) for ceremonial confirm-style actions
+//    where the visual weight matches the cultural intent.
+<Button variant="seal" size="lg">
+  결재 승인
+</Button>
+```
+
+---
+
+## Don't
+
+```tsx
+// ❌ Two primaries on the same surface — competing visual weight,
+//    user can't tell which is "the" action.
+<Button variant="primary">저장</Button>
+<Button variant="primary">미리보기</Button>
+```
+
+```tsx
+// ❌ Native <button> when a Button is needed — loses era theming, focus ring,
+//    shadow tokens, and the loading/disabled invariants.
+<button onClick={save}>저장</button>
+```
+
+```tsx
+// ❌ Manually toggling `disabled` to fake a loading state — the spinner,
+//    `aria-busy`, and label-width preservation are all dropped.
+<Button disabled={isSaving} onClick={save}>
+  저장
+</Button>
+```
+
+```tsx
+// ❌ Dropping the label and relying on icon-only — fails `button-name`
+//    in axe. If you need icon-only, supply `aria-label`.
+<Button variant="ghost" leftIcon={<SaveIcon />} />
+```
+
+```tsx
+// ❌ Hardcoding a contrast override — primary already uses `text-white`
+//    for AA in both eras (see Spec). A custom `text-*` class will regress.
+<Button variant="primary" className="text-era-inverse">
+  저장
+</Button>
+```
+
+---
+
+## Spec
+
+### Keyboard
+
+| Key                 | Action                                           |
+| ------------------- | ------------------------------------------------ |
+| `Tab` / `Shift+Tab` | Move focus to / from the button.                 |
+| `Enter` / `Space`   | Activate the button (native `<button>` default). |
+
+When `disabled` or `loading`, the button is removed from the focus order
+(`disabled` attribute on the underlying `<button>`).
+
+### Focus
+
+- The focus ring is era-aware: `focus:ring-2 focus:ring-offset-2` with the variant-specific tinted ring color (e.g. `accent-500/30` on primary, `error-500/30` on danger, `--era-edge-color-seal` on seal).
+- Focus is **not** programmatically restored after click — that responsibility belongs to the surface that wraps the button (e.g. `Modal` restores focus to its trigger on close).
+
+### Motion
+
+- `transition-colors duration-era ease-era-brush` — fill / border tween between eras and on hover. `duration-era` resolves to ~380ms (Heritage) / ~220ms (Neon).
+- The loading spinner uses `motion-safe:animate-spin`, so users with `prefers-reduced-motion: reduce` see a static circle (still labelled `aria-hidden="true"` — the `aria-busy` on the container conveys state).
+- No opacity-ramp entry animations on the container — see [Foundations/Accessibility](?path=/docs/foundations-accessibility--docs) for the full invariant.
+
+### a11y contract
+
+- Renders a real `<button>` — full keyboard, voice control, and assistive-tech support out of the box.
+- `aria-disabled={isDisabled}` mirrors the `disabled` attribute so AT announces both states.
+- `aria-busy={loading}` is set whenever `loading` is true. Combined with the label remaining in the a11y tree (the `<span>` uses `opacity-0` rather than `visibility:hidden`), screen readers announce both the name and busy state.
+- **Wave 5b2 contrast invariant**: `variant="primary"` paints `text-white` on `bg-accent-600`. The earlier `text-era-inverse` resolved to `#0b0e18` in Neon era and failed WCAG AA against electric indigo (1.6:1). `text-white` clears AA in both eras (5.6:1 Heritage, 4.7:1 Neon). Don't override this.
+- Spinner is `aria-hidden="true"`; the busy announcement comes from `aria-busy` on the container, not from the spinner itself.
+- Icon spans are `aria-hidden="true"` and decorative — meaningful labels must live in `children` (or `aria-label` if icon-only).
+
+---
+
+## Cross-references
+
+- [Components/Button](?path=/docs/components-button--docs) — full prop table, every variant story.
+- [Foundations/Accessibility](?path=/docs/foundations-accessibility--docs) — color-contrast invariants, keyboard contract.
+- [Foundations/Tokens](?path=/docs/foundations-tokens--docs) — the era-aware tokens consumed by the variants.
+- [Foundations/Era](?path=/docs/foundations-era--docs) — how `duration-era` and the variant fills resolve per era.

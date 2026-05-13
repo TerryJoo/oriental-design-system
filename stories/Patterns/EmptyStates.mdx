@@ -1,0 +1,222 @@
+import { Meta } from "@storybook/blocks";
+
+<Meta title="Patterns/Empty States" />
+
+# Empty / Error / Loading States
+
+Three closely-related zero-data UI states share a single design vocabulary
+in the Oriental Design System. Use this page as the canonical reference
+when wiring data-display components (DataTable, KanbanBoard, PageTree,
+CommandPalette) to async data sources.
+
+The shared building block is the `EmptyState` component
+(`src/components/EmptyState/`). It takes an optional `icon`, `title`,
+`description`, and `actions` slot, wraps everything in a dashed
+era-aware border, and centres the content. Every data-display component
+in this round either embeds `EmptyState` directly via a new
+`emptyState?: ReactNode` slot or defers to a `ReactNode` prop (e.g.
+`emptyMessage` on CommandPalette) so the same primitive carries the
+zero-state UX.
+
+---
+
+## When to use each state
+
+| State       | Triggered by                          | Visual                                                        | Examples in this DS                                  |
+| ----------- | ------------------------------------- | ------------------------------------------------------------- | ---------------------------------------------------- |
+| **Empty**   | Successful response with zero records | `<EmptyState>` placeholder, optional CTA                      | `DataTable.Empty`, `KanbanBoard.Empty`, `PageTree.Empty`, `CommandPalette.NoResults` |
+| **Loading** | In-flight async fetch                 | Skeleton placeholders matching the loaded layout (`<Skeleton aria-busy>`) | `DataTable.Loading`, `CommandPalette.Loading`        |
+| **Error**   | Failed response, validation breakage  | `<EmptyState>` with an error-tone icon + retry CTA            | (Pattern shown below; not yet wired into components)   |
+
+Pick the state by intent, not by tooling. "We don't know what to show"
+is loading. "We tried and there's nothing" is empty. "We tried and it
+broke" is error. The first two are temporary by nature; the last is
+recoverable but blocks the user, so it earns the most prominent CTA.
+
+---
+
+## Empty state pattern
+
+The default behaviour: every data-display component reaches for a
+canonical `<EmptyState>` when its data is empty. Korean default copy is
+provided so first-pass usage is sensible without props.
+
+### DataTable — `emptyState?: ReactNode`
+
+```tsx
+<DataTable<Row>
+  data={rows}
+  columns={columns}
+  // Default — Korean copy "데이터가 없습니다" rendered inside the body.
+/>
+
+<DataTable<Row>
+  data={[]}
+  columns={columns}
+  emptyState={
+    <EmptyState
+      title="검색 결과가 없습니다"
+      description="필터를 초기화해 보세요."
+      actions={<Button onClick={resetFilters}>필터 초기화</Button>}
+    />
+  }
+/>
+```
+
+The placeholder lives inside the `<tbody>` as a single full-width cell
+(`<td colSpan={columns.length}>`) so the table's structural chrome
+stays intact and screen readers can still announce the column headers.
+Pass `emptyState={null}` to opt back into the legacy bare-`<tbody>`
+behaviour.
+
+### KanbanBoard — `emptyState?: ReactNode`
+
+```tsx
+<KanbanBoard columns={[]} />
+// → renders default <EmptyState>: "보드가 비어 있습니다"
+
+<KanbanBoard
+  columns={[]}
+  emptyState={<EmptyState title="첫 컬럼을 추가하세요" actions={...} />}
+/>
+```
+
+Important distinction: the `emptyState` slot fires only when
+`columns.length === 0`. A board with **columns but no cards** is still
+a usable surface — each empty column keeps its `min-h-[160px]` body so
+it remains a valid drop target. See the `KanbanBoard.EmptyColumns`
+story for that case.
+
+### PageTree — `emptyState?: ReactNode`
+
+```tsx
+<PageTree nodes={[]} />
+// → renders default <EmptyState>: "페이지가 없습니다"
+```
+
+The empty branch deliberately drops `role="tree"` — an empty tree
+violates `aria-required-children` per axe. Once any node resolves, the
+standard tree semantics return.
+
+### CommandPalette — `emptyMessage: ReactNode`
+
+`CommandPalette` predates this round and already accepts a `ReactNode`
+empty-message via its existing `emptyMessage` prop. The
+`CommandPalette.NoResults` story demonstrates passing an `<EmptyState>`
+through that prop so the visual matches the rest of the system:
+
+```tsx
+<CommandPalette
+  items={items}
+  emptyMessage={
+    <EmptyState
+      title="일치하는 명령이 없습니다"
+      description="검색어를 줄이거나 다른 키워드를 사용해 보세요."
+    />
+  }
+/>
+```
+
+The empty branch already exposes `role="status" aria-live="polite"`
+(see `CommandPalette` source / `Empty-state ARIA` test group), so the
+`<EmptyState>` content is announced politely without further work.
+
+### Calendar — natural empty state
+
+`Calendar` has no events / annotations API in this iteration, so the
+natural empty state is the month grid itself with no overlay.
+`Calendar.Empty` is a documentation anchor for that convention: do
+**not** swap the grid for an `<EmptyState>` — render any zero-event
+placeholder in the surrounding chrome (sibling card, sidebar) and keep
+the grid keyboard-navigable.
+
+---
+
+## Loading state pattern
+
+Loading is **always** consumer-controlled. None of these components
+ship with a `loading` prop; instead, swap the data array for a
+placeholder that uses `<Skeleton>` rows that mirror the loaded layout.
+
+```tsx
+const PLACEHOLDER_ROWS = Array.from({ length: 4 }).map((_, i) => ({
+  id: `loading-${i}`,
+  /* …same shape as a real row… */
+}));
+
+const LOADING_COLUMNS = columns.map((col) => ({
+  ...col,
+  cell: () => <Skeleton width={80} height={12} />,
+}));
+
+<DataTable
+  data={isLoading ? PLACEHOLDER_ROWS : data}
+  columns={isLoading ? LOADING_COLUMNS : columns}
+/>;
+```
+
+`<Skeleton>` carries `aria-busy="true" aria-live="polite"` itself, so
+screen readers announce the busy state without the parent component
+needing extra ARIA. Match the skeleton's width/height to the real
+content so the table doesn't reflow when data resolves.
+
+For `CommandPalette`, the equivalent pattern is a single placeholder
+row whose `onSelect` is a no-op — see `CommandPalette.Loading`.
+
+---
+
+## Error state pattern
+
+Errors share the visual language of empty (an `<EmptyState>` block) but
+shift the tone via the icon and add a retry action:
+
+```tsx
+<EmptyState
+  icon={
+    <svg
+      viewBox="0 0 24 24"
+      width={36}
+      height={36}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.5}
+      aria-hidden="true"
+    >
+      <circle cx="12" cy="12" r="10" />
+      <path d="M12 8v4M12 16h.01" />
+    </svg>
+  }
+  title="데이터를 불러오지 못했습니다"
+  description="잠시 후 다시 시도해 주세요."
+  actions={
+    <Button variant="primary" onClick={retry}>
+      다시 시도
+    </Button>
+  }
+/>
+```
+
+Pass that node through the same `emptyState` / `emptyMessage` slot — no
+new prop is needed. The convention is: **state is conveyed by the
+content, not by the API.** A bell icon = empty, a warning icon = error,
+a spinner / skeleton = loading. The container component does not need
+to know which it is.
+
+For genuinely interruptive errors (network down, write failure during
+an in-flight gesture), surface a `<Toast variant="error">` or
+`<Alert role="alert">` instead — those are designed to break user flow
+politely and are in scope when the empty slot is not the right home.
+
+---
+
+## Cross-references
+
+- **`Components/EmptyState`** — base API (icon, title, description, actions)
+- **`Components/Skeleton`** — loading placeholder primitive (with `aria-busy`)
+- **`Components/DataTable`** — `Empty`, `EmptyWithCustomNode`, `Loading` stories
+- **`Components/KanbanBoard`** — `Empty`, `EmptyColumns` stories
+- **`Components/PageTree`** — `Empty` story
+- **`Components/CommandPalette`** — `EmptyState`, `NoResults`, `Loading` stories
+- **`Components/Calendar`** — `Empty` story (natural empty state)
+- **`Components/Toast`** / **`Components/Alert`** — interruptive error surfaces
+- **`Foundations/Accessibility`** — live-region announcement conventions

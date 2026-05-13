@@ -1,0 +1,301 @@
+import { Meta } from "@storybook/blocks";
+
+<Meta title="Anatomy/Modal" />
+
+# Modal — anatomy, do/don't, spec
+
+`Modal` is the system's interruptive surface — it pauses the underlying
+page, traps focus inside the panel, and locks body scroll until the
+user resolves it. Reach for it when the user must read or decide
+something **before** continuing the parent flow. For inline contextual
+surfaces (filter previews, mention popovers), use
+[`Popover`](?path=/docs/anatomy-popover--docs) instead; it keeps the
+page interactive.
+
+This page documents the visual decomposition, prop contract, common
+usage patterns, and the keyboard / focus / motion / a11y spec that the
+component honours.
+
+---
+
+## Anatomy
+
+The Modal is composed of two stacked layers and four optional content
+slots inside the panel:
+
+```
+┌─────────────────────────────────────────────────┐
+│ ① Backdrop  (role="presentation", click closes) │
+│    ┌───────────────────────────────────────┐    │
+│    │ ② Panel (role="dialog", aria-modal)   │    │
+│    │   ┌─────────────────────────────────┐ │    │
+│    │   │ ③ Title  (h2 — aria-labelledby) │ │    │
+│    │   │ ④ Description (aria-describedby)│ │    │
+│    │   │                                 │ │    │
+│    │   │   …children…                    │ │    │
+│    │   │                                 │ │    │
+│    │   │ ⑤ Footer (action buttons)       │ │    │
+│    │   └─────────────────────────────────┘ │    │
+│    └───────────────────────────────────────┘    │
+└─────────────────────────────────────────────────┘
+```
+
+| Part | Role / class                          | Source                                       |
+| ---- | ------------------------------------- | -------------------------------------------- |
+| ①    | `role="presentation"`, `modalBackdrop`| `Modal.styles.ts` — fixed inset, era-overlay, blur, fade-in |
+| ②    | `role` = `dialog` \| `alertdialog`, `aria-modal="true"`, `tabIndex={-1}` | `Modal.tsx` — `panelRef` host, focus trap on Tab |
+| ③    | `<h2>` with generated `id` referenced by `aria-labelledby` | `modalTitle` — only rendered when `title` prop set |
+| ④    | `<p>` with generated `id` referenced by `aria-describedby` | `modalDescription` — only rendered when `description` prop set |
+| ⑤    | `<div>` flex-row, `justify-end gap-2` | `modalFooter` — only rendered when `footer` prop set |
+
+The panel is rendered through `<Portal>` so it escapes any `overflow:
+hidden` ancestor and stacks above page chrome via
+`z-modal-backdrop` / `z-modal`.
+
+---
+
+## Props
+
+Grouped by purpose. The full autodocs prop table (with default values
+and inline descriptions) lives at
+[`Components/Modal`](?path=/docs/components-modal--docs).
+
+### State
+
+| Prop                  | Type                | Notes                                                      |
+| --------------------- | ------------------- | ---------------------------------------------------------- |
+| `open`                | `boolean`           | Required. Component returns `null` when `false`.           |
+| `onClose`             | `() => void`        | Fired on Escape, backdrop click, and any consumer-driven close. |
+
+### Content
+
+| Prop          | Type        | Notes                                                      |
+| ------------- | ----------- | ---------------------------------------------------------- |
+| `title`       | `ReactNode` | Renders an `<h2>`; wires `aria-labelledby`.                |
+| `description` | `ReactNode` | Renders a `<p>`; wires `aria-describedby`.                 |
+| `footer`      | `ReactNode` | Right-aligned action row.                                  |
+| `children`    | `ReactNode` | Free-form body between description and footer.             |
+
+### Behaviour
+
+| Prop                   | Type                            | Default     | Notes                                                          |
+| ---------------------- | ------------------------------- | ----------- | -------------------------------------------------------------- |
+| `size`                 | `"sm" \| "md" \| "lg"`          | `"md"`      | Panel `max-w-sm` / `max-w-lg` / `max-w-2xl`.                   |
+| `role`                 | `"dialog" \| "alertdialog"`     | `"dialog"`  | Use `"alertdialog"` for destructive confirmations.             |
+| `closeOnBackdropClick` | `boolean`                       | `true`      | Set to `false` when accidental dismissal would lose data.      |
+| `closeOnEscape`        | `boolean`                       | `true`      | Listener is window-level; works even when focus has escaped.   |
+| `initialFocusRef`      | `RefObject<HTMLElement>`        | —           | If unset, the first focusable descendant is focused; if none, the panel itself. |
+
+---
+
+## Do
+
+### Use `role="alertdialog"` for destructive confirmations
+
+```tsx
+<Modal
+  open={isConfirmOpen}
+  onClose={cancel}
+  role="alertdialog"
+  title="프로젝트를 삭제하시겠습니까?"
+  description="이 작업은 되돌릴 수 없습니다."
+  footer={
+    <>
+      <Button variant="ghost" onClick={cancel}>취소</Button>
+      <Button variant="primary" onClick={confirmDelete}>삭제</Button>
+    </>
+  }
+/>
+```
+
+`alertdialog` tells assistive tech the dialog is interruptive and the
+user must respond. Reserve it for destructive or blocking decisions.
+
+### Pin initial focus to the safe action with `initialFocusRef`
+
+```tsx
+const cancelRef = useRef<HTMLButtonElement>(null);
+
+<Modal
+  open={open}
+  onClose={cancel}
+  initialFocusRef={cancelRef}
+  title="변경사항을 저장하시겠습니까?"
+  footer={
+    <>
+      <Button ref={cancelRef} variant="ghost" onClick={cancel}>취소</Button>
+      <Button variant="primary" onClick={save}>저장</Button>
+    </>
+  }
+/>
+```
+
+Default focus on the destructive action is a footgun. Always point
+`initialFocusRef` at the *safe* button.
+
+### Disable backdrop dismissal for in-progress forms
+
+```tsx
+<Modal
+  open={open}
+  onClose={attemptClose}
+  closeOnBackdropClick={false}
+  closeOnEscape={false}
+  title="새 글 작성"
+  footer={<SaveDraftActions />}
+>
+  <ArticleForm />
+</Modal>
+```
+
+If casual dismissal would lose typed input, route closing through your
+own confirm flow. Consider a "Discard?" sub-modal.
+
+### Wire the title — every dialog needs an accessible name
+
+```tsx
+<Modal open={open} onClose={onClose} title="알림 설정">
+  <NotificationsForm />
+</Modal>
+```
+
+The `title` prop generates the `<h2>` and `aria-labelledby` wiring for
+free. If you must build a custom header, set `aria-labelledby` on the
+panel manually and skip the `title` prop.
+
+---
+
+## Don't
+
+### Don't render `<Modal>` conditionally outside the prop
+
+```tsx
+{open && <Modal open onClose={close} />}
+```
+
+The component already returns `null` when `open` is `false`, but
+**focus restoration runs in the unmount cleanup**. Wrapping with `{open
+&& …}` unmounts the entire effect graph, so focus is restored
+correctly there too — the issue is more subtle: if the parent
+re-renders frequently while `open` is true, you can lose stable
+references the focus trap depends on. Pass `open` as a prop and let the
+component decide.
+
+### Don't put the trigger button inside the modal
+
+```tsx
+<Modal open footer={<Button onClick={openSubModal}>다음</Button>}>
+  <Modal open={subOpen} onClose={closeSub} />
+</Modal>
+```
+
+Nesting modal markup inside another modal's footer ties the two
+together at the React tree level. Render sub-modals as siblings —
+`openModalCount` already coordinates body-scroll-lock across instances.
+
+### Don't disable Escape without an extra-clear close affordance
+
+If you set `closeOnEscape={false}` and `closeOnBackdropClick={false}`,
+your modal is **only** closable through a button you render. Make that
+button visually obvious; otherwise keyboard users cannot escape.
+
+### Don't add an opacity ramp to the panel entrance
+
+Wave 5b2 fixed mid-frame contrast failures by removing opacity-driven
+keyframes. The panel uses `motion-safe:animate-scale-in` (transform
+only). Keep it that way — never override with custom `@keyframes` that
+animate `opacity`.
+
+### Don't reach into the `role="presentation"` backdrop for content
+
+The backdrop is a hit-target for click-to-close, not a content
+container. Anything visible should live inside the panel so the focus
+trap and `aria-modal` shielding cover it.
+
+---
+
+## Spec
+
+### Keyboard
+
+| Key            | Behaviour                                                              |
+| -------------- | ---------------------------------------------------------------------- |
+| `Escape`       | Calls `onClose` (unless `closeOnEscape={false}`). Listener is window-level so it fires even if focus has somehow escaped the panel. |
+| `Tab`          | Cycles forward through focusables inside the panel; wraps to first when at the last element. |
+| `Shift+Tab`    | Cycles backward; wraps to last when at the first element.              |
+| Other keys     | Pass through to the focused element normally.                          |
+
+The trap collects focusables every keystroke (`getFocusableElements`),
+so dynamically rendered fields participate without a re-mount.
+
+### Focus management
+
+- **On open** — after one `setTimeout(0)` (so the portal has mounted),
+  focus moves to `initialFocusRef?.current`, then the first focusable
+  descendant, then the panel itself (`tabIndex={-1}`).
+- **On close** — focus restores to `document.activeElement` captured
+  *before* opening. If that element has been removed from the DOM,
+  focus falls back to `document.body`.
+- **Trap** — implemented in `handlePanelKeyDown`. When focus is at the
+  last element and the user presses `Tab`, it wraps to the first; same
+  in reverse for `Shift+Tab`.
+
+### Click-outside
+
+The backdrop has `onClick={handleBackdrop}`. Closing only fires when
+`e.target === e.currentTarget` (i.e. the click landed on the backdrop
+itself, not a child of the panel) and `closeOnBackdropClick` is `true`.
+
+### Body scroll lock
+
+A module-level counter (`openModalCount`) coordinates lock state
+across stacked modals. The first modal to open captures
+`document.body.style.overflow` and sets it to `hidden`; the last to
+close restores the prior value. SSR-safe — the effect is gated on
+`typeof document !== "undefined"`.
+
+### `role`
+
+| Value          | When to use                                                                |
+| -------------- | -------------------------------------------------------------------------- |
+| `"dialog"`     | Default. Standard modal dialogs (forms, settings, content viewers).        |
+| `"alertdialog"`| Destructive confirmations, fatal errors, or any dialog the user must answer. |
+
+Both roles set `aria-modal="true"`. `aria-labelledby` and
+`aria-describedby` are wired only when the corresponding prop is set
+(`title` / `description`).
+
+### Motion
+
+- Backdrop: `motion-safe:animate-fade-in` (acceptable here — the
+  backdrop is decorative chrome with no text contrast obligations).
+- Panel: `motion-safe:animate-scale-in` (transform-only). **Do not**
+  swap to an opacity-bearing keyframe; mid-frame text would fail axe
+  contrast (Wave 5b2 convention #1).
+- Both keyframes are wrapped in `motion-safe:` so users with
+  `prefers-reduced-motion: reduce` get an instant render.
+
+### A11y contract
+
+- `aria-modal="true"` on the panel — assistive tech treats outside
+  content as inert.
+- `aria-labelledby` references the title's auto-generated id when
+  `title` is set.
+- `aria-describedby` references the description's auto-generated id
+  when `description` is set.
+- Title renders as `<h2>` to keep the surrounding page outline intact;
+  promote to `<h1>` only inside a full-page modal route.
+- Focus-visible rings on inner controls use the standard era ring
+  (`focus-visible:ring-2 ring-era-brand`) — the panel itself does not
+  show a focus ring because it only receives focus when no inner
+  control exists.
+
+---
+
+## Cross-references
+
+- [`Components/Modal`](?path=/docs/components-modal--docs) — autodocs, full prop table, all stories
+- [`Anatomy/Popover`](?path=/docs/anatomy-popover--docs) — non-modal sibling for inline contextual surfaces
+- [`Anatomy/DropdownMenu`](?path=/docs/anatomy-dropdownmenu--docs) — `role="menu"` surface for action lists
+- [`Foundations/Accessibility`](?path=/docs/foundations-accessibility--docs) — focus-trap and live-region conventions
+- WAI-ARIA Authoring Practices — [Dialog (Modal) pattern](https://www.w3.org/WAI/ARIA/apg/patterns/dialog-modal/)
